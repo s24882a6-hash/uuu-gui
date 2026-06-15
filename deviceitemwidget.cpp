@@ -56,7 +56,7 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     setObjectName("deviceItem");
     setStyleSheet("#deviceItem { border-bottom: 1px solid palette(mid); }");
 
-    connect(m_check,    &QCheckBox::stateChanged, this, [this](int) { emit checkStateChanged(m_check->checkState()); });
+    connect(m_check,    &QCheckBox::stateChanged, this, [this](int) { emit checkStateChanged(); });
     connect(m_btnLog,   &QPushButton::clicked,         this, &DeviceItemWidget::showLog);
     connect(m_btnFlash, &QPushButton::clicked, this, [this]() {
         if (isFlashing())
