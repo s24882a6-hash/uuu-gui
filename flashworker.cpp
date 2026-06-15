@@ -169,10 +169,19 @@ void FlashWorker::parseLine(const QString& line)
         return;
     }
 
+    // VT mode (Linux/macOS): "0:12  1/ 2 [  48%  ] SDPS: ..."
     static const QRegularExpression rePercent(R"(\[[^\]]*?(\d+)%[^\]]*?\])");
     QRegularExpressionMatch m = rePercent.match(line);
     if (m.hasMatch()) {
         emit progressChanged(qMin(99, m.captured(1).toInt()));
+        return;
+    }
+
+    // Verbose mode (Windows): bare "27%" line
+    static const QRegularExpression rePercentVerbose(R"(^(\d+)%$)");
+    QRegularExpressionMatch m2 = rePercentVerbose.match(line);
+    if (m2.hasMatch()) {
+        emit progressChanged(qMin(99, m2.captured(1).toInt()));
         return;
     }
 
