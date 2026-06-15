@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libusb-1.0-0-dev cmake build-essential \
+          sudo apt-get install -y qt6-base-dev libqt6svg6-dev libusb-1.0-0-dev cmake build-essential \
             libgl-dev libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 \
             qt6-gtk-platformtheme
@@ -129,16 +129,6 @@ jobs:
 
       - name: Install libusb
         run: vcpkg install libusb --triplet x64-windows
-
-      - name: Generate Windows icon
-        run: |
-          choco install inkscape -y --no-progress
-          $sizes = @(16,32,48,64,128,256)
-          foreach ($s in $sizes) {
-            & "C:\Program Files\Inkscape\bin\inkscape.exe" --export-type=png --export-width=$s --export-filename="icon_$s.png" icons/uuuapp.svg
-          }
-          magick convert icon_256.png icon_128.png icon_64.png icon_48.png icon_32.png icon_16.png icons/uuuapp.ico
-        shell: pwsh
 
       - name: Build
         run: |
