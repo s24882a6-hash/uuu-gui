@@ -7,16 +7,19 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QStyledItemDelegate>
 #include <QVBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -24,6 +27,80 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QDir>
+
+static constexpr int kPresetDescRole = Qt::UserRole + 1;
+
+class PresetDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
+    {
+        QString desc = index.data(kPresetDescRole).toString();
+        int lines = desc.isEmpty() ? 0 : desc.count('\n') + 1;
+        QFont nameFont2 = option.font;
+        nameFont2.setPointSize(option.font.pointSize() + 4);
+        QFont descFont = option.font;
+        descFont.setPointSize(qMax(option.font.pointSize() - 3, 6));
+        int nameH = QFontMetrics(nameFont2).height();
+        int descH = QFontMetrics(descFont).height();
+        int total = 12 + nameH + (lines > 0 ? 3 + descH * lines + 2 * (lines - 1) : 0) + 12;
+        return QSize(0, total);
+    }
+
+    void paint(QPainter* p, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+    {
+        // Draw background/selection without text (clear it so base doesn't render it)
+        QStyleOptionViewItem opt = option;
+        initStyleOption(&opt, index);
+        opt.text.clear();
+        QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &opt, p);
+
+        QString name = index.data(Qt::DisplayRole).toString();
+        QString desc = index.data(kPresetDescRole).toString();
+
+        bool selected = option.state & QStyle::State_Selected;
+        QRect r = option.rect.adjusted(10, 0, -6, 0);
+
+        QFont nameFont = option.font;
+        nameFont.setPointSize(option.font.pointSize() + 4);
+        QFont descFont = option.font;
+        descFont.setPointSize(qMax(option.font.pointSize() - 3, 6));
+
+        QColor nameColor = option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
+        QColor descColor = selected
+            ? nameColor.lighter(160)
+            : option.palette.color(QPalette::PlaceholderText);
+
+        QFontMetrics nameFm(nameFont);
+        QFontMetrics descFm(descFont);
+        int nameH = nameFm.height();
+        int descLineH = descFm.height();
+        QStringList descLines = desc.split('\n');
+        int descTotalH = desc.isEmpty() ? 0 : descLineH * descLines.size() + 2 * (descLines.size() - 1);
+        int totalH = nameH + (descTotalH > 0 ? 3 + descTotalH : 0);
+        int topY = r.top() + (r.height() - totalH) / 2;
+
+        p->save();
+        p->setFont(nameFont);
+        p->setPen(nameColor);
+        p->drawText(QRect(r.left(), topY, r.width(), nameH),
+                    Qt::AlignLeft | Qt::AlignVCenter, name);
+
+        if (!desc.isEmpty()) {
+            p->setFont(descFont);
+            p->setPen(descColor);
+            int y = topY + nameH + 3;
+            for (const QString& line : descLines) {
+                p->drawText(QRect(r.left(), y, r.width(), descLineH),
+                            Qt::AlignLeft | Qt::AlignVCenter, line);
+                y += descLineH + 2;
+            }
+        }
+        p->restore();
+    }
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -139,6 +216,7 @@ QWidget* MainWindow::makePresetsPanel()
     auto* layout = new QVBoxLayout(group);
 
     m_presetList = new QListWidget(group);
+    m_presetList->setItemDelegate(new PresetDelegate(m_presetList));
     layout->addWidget(m_presetList);
 
     auto* btnRow = new QHBoxLayout;
@@ -329,13 +407,48 @@ QString MainWindow::currentSudoPrefix() const
 
 void MainWindow::refreshPresetList()
 {
+    QString selectedId;
+    if (!m_presetList->selectedItems().isEmpty())
+        selectedId = m_presetList->selectedItems().first()->data(Qt::UserRole).toString();
+
     m_presetList->clear();
     for (const auto& p : m_presets) {
         auto* item = new QListWidgetItem(m_presetList);
         item->setText(p.name);
         item->setToolTip(p.description());
         item->setData(Qt::UserRole, p.id);
+
+        QStringList descLines;
+        switch (p.type) {
+        case FirmwarePreset::Type::SimpleBin:
+            descLines << "bin: " + QFileInfo(p.binPath).fileName();
+            break;
+        case FirmwarePreset::Type::EmmcAll:
+            descLines << "bootloader: " + QFileInfo(p.binPath).fileName();
+            descLines << "wic: "        + QFileInfo(p.wicPath).fileName();
+            break;
+        case FirmwarePreset::Type::EmmcAll4G:
+            descLines << "bin: "        + QFileInfo(p.bin4gPath).fileName();
+            descLines << "bootloader: " + QFileInfo(p.binPath).fileName();
+            descLines << "wic: "        + QFileInfo(p.wicPath).fileName();
+            break;
+        }
+        item->setData(kPresetDescRole, descLines.join("\n"));
     }
+
+    // Restore or auto-select first item
+    bool restored = false;
+    if (!selectedId.isEmpty()) {
+        for (int i = 0; i < m_presetList->count(); ++i) {
+            if (m_presetList->item(i)->data(Qt::UserRole).toString() == selectedId) {
+                m_presetList->setCurrentRow(i);
+                restored = true;
+                break;
+            }
+        }
+    }
+    if (!restored && m_presetList->count() > 0)
+        m_presetList->setCurrentRow(0);
 
     // Refresh auto-preset combo
     QString autoId = m_autoPreset->currentData().toString();
