@@ -4,6 +4,9 @@
 
 int main(int argc, char* argv[])
 {
+#ifdef Q_OS_WIN
+    QApplication::setStyle("windowsvista");
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("UUU Flash Tool");
     app.setOrganizationName("uuuapp");
