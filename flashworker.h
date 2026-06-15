@@ -39,6 +39,7 @@ private slots:
 private:
     QStringList buildPhaseCommand(int phaseIndex) const;
     void parseLine(const QString& line);
+    void emitScaledProgress(int phasePct);
 
     QString            m_uuuPath;
     FirmwarePreset     m_preset;
@@ -52,6 +53,7 @@ private:
     bool               m_active            = false;
     bool               m_rebootAfterFlash  = false;
     bool               m_permissionError   = false;
+    bool               m_holdsSharedLock   = false;
     int                m_stepsDone         = 0;
     int                m_stepsTotal        = 0;
     bool               m_lastWasCmd        = false;
