@@ -15,7 +15,7 @@
 PresetDialog::PresetDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle("New Firmware Preset");
+    setWindowTitle(tr("New Firmware Preset"));
     setupUi();
     onTypeChanged();
     validate();
@@ -25,7 +25,7 @@ PresetDialog::PresetDialog(const FirmwarePreset& preset, QWidget* parent)
     : QDialog(parent)
     , m_editId(preset.id)
 {
-    setWindowTitle("Edit Firmware Preset");
+    setWindowTitle(tr("Edit Firmware Preset"));
     setupUi();
     populate(preset);
     onTypeChanged();
@@ -40,16 +40,16 @@ void PresetDialog::setupUi()
     // --- Name ---
     auto* formLayout = new QFormLayout;
     m_name = new QLineEdit(this);
-    m_name->setPlaceholderText("My Preset");
-    formLayout->addRow("Preset name:", m_name);
+    m_name->setPlaceholderText(tr("My Preset"));
+    formLayout->addRow(tr("Preset name:"), m_name);
     root->addLayout(formLayout);
 
     // --- Type ---
-    auto* typeGroup = new QGroupBox("Flash type", this);
+    auto* typeGroup = new QGroupBox(tr("Flash type"), this);
     auto* typeVBox  = new QVBoxLayout(typeGroup);
-    m_rdSimple  = new QRadioButton("Simple boot      (uuu <file.bin>)", typeGroup);
-    m_rdEmmc    = new QRadioButton("Full eMMC        (uuu -b emmc_all <bootloader> <image.wic>)", typeGroup);
-    m_rdEmmc4g  = new QRadioButton("Full eMMC + 4G   (uuu <4g.bin> → uuu -b emmc_all <bootloader> <image.wic>)", typeGroup);
+    m_rdSimple  = new QRadioButton(tr("Simple boot      (uuu <file.bin>)"), typeGroup);
+    m_rdEmmc    = new QRadioButton(tr("Full eMMC        (uuu -b emmc_all <bootloader> <image.wic>)"), typeGroup);
+    m_rdEmmc4g  = new QRadioButton(tr("Full eMMC + 4G   (uuu <4g.bin> → uuu -b emmc_all <bootloader> <image.wic>)"), typeGroup);
     m_rdSimple->setChecked(true);
     typeVBox->addWidget(m_rdSimple);
     typeVBox->addWidget(m_rdEmmc);
@@ -57,42 +57,42 @@ void PresetDialog::setupUi()
     root->addWidget(typeGroup);
 
     // --- Paths ---
-    auto* pathGroup  = new QGroupBox("Files", this);
+    auto* pathGroup  = new QGroupBox(tr("Files"), this);
     auto* pathLayout = new QFormLayout(pathGroup);
 
-    m_lblBin4g = new QLabel("4G init file (.bin):", pathGroup);
+    m_lblBin4g = new QLabel(tr("4G init file (.bin):"), pathGroup);
     auto* bin4gRow = new QHBoxLayout;
     m_bin4gPath    = new QLineEdit(pathGroup);
     m_bin4gPath->setPlaceholderText("path/to/imx-boot_4G.bin");
-    m_btnBin4g     = new QPushButton("Browse…", pathGroup);
+    m_btnBin4g     = new QPushButton(tr("Browse…"), pathGroup);
     bin4gRow->addWidget(m_bin4gPath);
     bin4gRow->addWidget(m_btnBin4g);
     pathLayout->addRow(m_lblBin4g, bin4gRow);
 
-    m_lblBin = new QLabel("Boot file (.bin / .imx):", pathGroup);
+    m_lblBin = new QLabel(tr("Boot file (.bin / .imx):"), pathGroup);
     auto* binRow   = new QHBoxLayout;
     m_binPath      = new QLineEdit(pathGroup);
     m_binPath->setPlaceholderText("path/to/imx-boot.bin");
-    m_btnBin       = new QPushButton("Browse…", pathGroup);
+    m_btnBin       = new QPushButton(tr("Browse…"), pathGroup);
     binRow->addWidget(m_binPath);
     binRow->addWidget(m_btnBin);
     pathLayout->addRow(m_lblBin, binRow);
 
-    m_lblWic = new QLabel("Image file (.wic):", pathGroup);
+    m_lblWic = new QLabel(tr("Image file (.wic):"), pathGroup);
     auto* wicRow   = new QHBoxLayout;
     m_wicPath      = new QLineEdit(pathGroup);
     m_wicPath->setPlaceholderText("path/to/image.wic");
-    m_btnWic       = new QPushButton("Browse…", pathGroup);
+    m_btnWic       = new QPushButton(tr("Browse…"), pathGroup);
     wicRow->addWidget(m_wicPath);
     wicRow->addWidget(m_btnWic);
     pathLayout->addRow(m_lblWic, wicRow);
 
-    m_lblDelay = new QLabel("Delay between phases (s):", pathGroup);
+    m_lblDelay = new QLabel(tr("Delay between phases (s):"), pathGroup);
     m_spinDelay = new QSpinBox(pathGroup);
     m_spinDelay->setRange(1, 30);
     m_spinDelay->setValue(2);
-    m_spinDelay->setToolTip("Seconds to wait after Phase 1 before starting Phase 2.\n"
-                             "Increase to 5–10 if device doesn't re-enumerate in time.");
+    m_spinDelay->setToolTip(tr("Seconds to wait after Phase 1 before starting Phase 2.\n"
+                               "Increase to 5–10 if device doesn't re-enumerate in time."));
     pathLayout->addRow(m_lblDelay, m_spinDelay);
 
     root->addWidget(pathGroup);
@@ -152,8 +152,8 @@ void PresetDialog::onTypeChanged()
     m_spinDelay->setVisible(needBin4g);
 
     m_lblBin->setText((emmc || emmc4g)
-        ? "Bootloader (.bin / .imx):"
-        : "Boot file (.bin / .imx):");
+        ? tr("Bootloader (.bin / .imx):")
+        : tr("Boot file (.bin / .imx):"));
 
     validate();
 }
@@ -161,8 +161,8 @@ void PresetDialog::onTypeChanged()
 void PresetDialog::browseBin4g()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, "Select 4G init file", m_bin4gPath->text(),
-        "Binary files (*.bin *.imx);;All files (*)");
+        this, tr("Select 4G init file"), m_bin4gPath->text(),
+        tr("Binary files (*.bin *.imx);;All files (*)"));
     if (!path.isEmpty())
         m_bin4gPath->setText(path);
 }
@@ -170,8 +170,8 @@ void PresetDialog::browseBin4g()
 void PresetDialog::browseBin()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, "Select boot file", m_binPath->text(),
-        "Binary files (*.bin *.imx);;All files (*)");
+        this, tr("Select boot file"), m_binPath->text(),
+        tr("Binary files (*.bin *.imx);;All files (*)"));
     if (!path.isEmpty())
         m_binPath->setText(path);
 }
@@ -179,8 +179,8 @@ void PresetDialog::browseBin()
 void PresetDialog::browseWic()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, "Select image file", m_wicPath->text(),
-        "WIC images (*.wic *.img);;All files (*)");
+        this, tr("Select image file"), m_wicPath->text(),
+        tr("WIC images (*.wic *.img);;All files (*)"));
     if (!path.isEmpty())
         m_wicPath->setText(path);
 }

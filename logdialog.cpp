@@ -10,7 +10,7 @@ LogDialog::LogDialog(const QString& deviceName, QWidget* parent)
     : QDialog(parent)
     , m_title(deviceName)
 {
-    setWindowTitle(QString("Log — %1").arg(deviceName));
+    setWindowTitle(tr("Log — %1").arg(deviceName));
     setMinimumSize(640, 400);
 
     auto* layout = new QVBoxLayout(this);
@@ -24,7 +24,7 @@ LogDialog::LogDialog(const QString& deviceName, QWidget* parent)
 
     layout->addWidget(m_log);
 
-    auto* btnClose = new QPushButton("Close", this);
+    auto* btnClose = new QPushButton(tr("Close"), this);
     auto* btnLayout = new QHBoxLayout;
     btnLayout->addStretch();
     btnLayout->addWidget(btnClose);
@@ -42,5 +42,5 @@ void LogDialog::appendLine(const QString& line)
 
 void LogDialog::setStatus(const QString& status)
 {
-    setWindowTitle(QString("Log — %1 [%2]").arg(m_title, status));
+    setWindowTitle(tr("Log — %1 [%2]").arg(m_title, status));
 }

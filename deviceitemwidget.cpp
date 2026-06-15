@@ -29,7 +29,7 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     m_lblName->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     layout->addWidget(m_lblName, 1);
 
-    m_lblStatus = new QLabel("Idle", this);
+    m_lblStatus = new QLabel(tr("Idle"), this);
     m_lblStatus->setFixedWidth(80);
     layout->addWidget(m_lblStatus);
 
@@ -46,11 +46,11 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     m_lblPct->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     layout->addWidget(m_lblPct);
 
-    m_btnFlash = new QPushButton("Flash", this);
+    m_btnFlash = new QPushButton(tr("Flash"), this);
     m_btnFlash->setFixedWidth(72);
     layout->addWidget(m_btnFlash);
 
-    m_btnLog = new QPushButton("Logs", this);
+    m_btnLog = new QPushButton(tr("Logs"), this);
     m_btnLog->setFixedWidth(60);
     layout->addWidget(m_btnLog);
 
@@ -113,7 +113,7 @@ void DeviceItemWidget::flash(const QString& uuuPath,
     if (!m_logDialog)
         m_logDialog = new LogDialog(m_device.displayName(), this);
     else
-        m_logDialog->setStatus("Flashing…");
+        m_logDialog->setStatus(tr("Flashing…"));
 
     setFlashingState(true);
     m_worker->start();
@@ -137,10 +137,10 @@ void DeviceItemWidget::reboot(const QString& uuuPath, const QString& sudoPrefix)
     if (!m_logDialog)
         m_logDialog = new LogDialog(m_device.displayName(), this);
     else
-        m_logDialog->setStatus("Rebooting…");
+        m_logDialog->setStatus(tr("Rebooting…"));
 
     setFlashingState(true);
-    m_lblStatus->setText("Rebooting…");
+    m_lblStatus->setText(tr("Rebooting…"));
     m_worker->startReboot();
 }
 
@@ -167,17 +167,17 @@ void DeviceItemWidget::onFlashFinished(bool success, const QString& err)
     emit flashDone(success);
 
     if (success) {
-        m_lblStatus->setText("Done");
+        m_lblStatus->setText(tr("Done"));
         m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
         m_bar->setValue(100);
         m_lblPct->setText("100%");
-        if (m_logDialog) m_logDialog->setStatus("Done");
+        if (m_logDialog) m_logDialog->setStatus(tr("Done"));
     } else {
-        m_lblStatus->setText("Error");
+        m_lblStatus->setText(tr("Error"));
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         if (m_logDialog) {
             m_logDialog->appendLine(QString("\n[ERROR] %1").arg(err));
-            m_logDialog->setStatus("Error");
+            m_logDialog->setStatus(tr("Error"));
         }
     }
 }
@@ -193,9 +193,9 @@ void DeviceItemWidget::showLog()
 
 void DeviceItemWidget::setFlashingState(bool active)
 {
-    m_lblStatus->setText(active ? "Flashing…" : "Idle");
+    m_lblStatus->setText(active ? tr("Flashing…") : tr("Idle"));
     m_lblStatus->setStyleSheet(active ? "color: orange; font-weight: bold;" : "");
-    m_btnFlash->setText(active ? "Cancel" : "Flash");
+    m_btnFlash->setText(active ? tr("Cancel") : tr("Flash"));
     if (!active) { m_bar->setValue(0); m_lblPct->setText("0%"); }
 }
 
@@ -205,19 +205,19 @@ void DeviceItemWidget::onPermissionError()
     setFlashingState(false);
 
     if (m_logDialog)
-        m_logDialog->appendLine("\n[ERROR] Permission denied accessing USB device.");
+        m_logDialog->appendLine(tr("\n[ERROR] Permission denied accessing USB device."));
 
     auto reply = QMessageBox::question(
         this,
-        "Permission denied",
-        "Cannot open USB device — permission denied.\n\n"
-        "Retry with pkexec (a password dialog will appear)?",
+        tr("Permission denied"),
+        tr("Cannot open USB device — permission denied.\n\n"
+           "Retry with pkexec (a password dialog will appear)?"),
         QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
         flash(m_lastUuuPath, m_lastPreset, "pkexec", m_lastRebootAfter);
     } else {
-        m_lblStatus->setText("Error");
+        m_lblStatus->setText(tr("Error"));
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         emit flashDone(false);
     }

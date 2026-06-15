@@ -1,8 +1,10 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <QIcon>
+#include <QLocale>
 #include <QPalette>
 #include <QStyleFactory>
+#include <QTranslator>
 #ifdef Q_OS_WIN
 #  include <QSettings>
 #endif
@@ -52,6 +54,12 @@ int main(int argc, char* argv[])
     app.setOrganizationName("uuuapp");
     app.setApplicationVersion("1.0.0");
     app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
+
+    QTranslator translator;
+    if (QLocale::system().language() == QLocale::Russian) {
+        if (translator.load(":/i18n/uuuapp_ru.qm"))
+            app.installTranslator(&translator);
+    }
 
 #ifdef Q_OS_WIN
     if (windowsDarkModeEnabled())

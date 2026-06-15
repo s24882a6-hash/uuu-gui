@@ -108,7 +108,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_monitor(new DeviceMonitor(this))
 {
-    setWindowTitle("UUU Flash Tool");
+    setWindowTitle(tr("UUU Flash Tool"));
     setMinimumSize(900, 600);
 
     setupUi();
@@ -174,23 +174,23 @@ void MainWindow::setupUi()
 
 QWidget* MainWindow::makeUuuBar()
 {
-    auto* bar    = new QGroupBox("UUU Binary", this);
+    auto* bar    = new QGroupBox(tr("UUU Binary"), this);
     auto* layout = new QHBoxLayout(bar);
 
-    layout->addWidget(new QLabel("Path:", bar));
+    layout->addWidget(new QLabel(tr("Path:"), bar));
 
     m_uuuCombo = new QComboBox(bar);
     m_uuuCombo->setEditable(true);
     m_uuuCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     layout->addWidget(m_uuuCombo, 2);
 
-    m_uuuBrowse = new QPushButton("Browse…", bar);
+    m_uuuBrowse = new QPushButton(tr("Browse…"), bar);
     m_uuuBrowse->setFixedWidth(80);
     layout->addWidget(m_uuuBrowse);
 
-    layout->addWidget(new QLabel("  Privilege:", bar));
+    layout->addWidget(new QLabel(tr("  Privilege:"), bar));
     m_sudoCombo = new QComboBox(bar);
-    m_sudoCombo->addItem("None (run as-is)", "");
+    m_sudoCombo->addItem(tr("None (run as-is)"), "");
 #ifdef Q_OS_LINUX
     m_sudoCombo->addItem("sudo",   "sudo");
     m_sudoCombo->addItem("pkexec", "pkexec");
@@ -212,7 +212,7 @@ QWidget* MainWindow::makeUuuBar()
 
 QWidget* MainWindow::makePresetsPanel()
 {
-    auto* group  = new QGroupBox("Firmware Presets", this);
+    auto* group  = new QGroupBox(tr("Firmware Presets"), this);
     auto* layout = new QVBoxLayout(group);
 
     m_presetList = new QListWidget(group);
@@ -220,9 +220,9 @@ QWidget* MainWindow::makePresetsPanel()
     layout->addWidget(m_presetList);
 
     auto* btnRow = new QHBoxLayout;
-    m_btnAdd    = new QPushButton("+  Add",  group);
-    m_btnEdit   = new QPushButton("Edit",    group);
-    m_btnDelete = new QPushButton("Delete",  group);
+    m_btnAdd    = new QPushButton(tr("+  Add"),  group);
+    m_btnEdit   = new QPushButton(tr("Edit"),    group);
+    m_btnDelete = new QPushButton(tr("Delete"),  group);
     m_btnEdit->setEnabled(false);
     m_btnDelete->setEnabled(false);
     btnRow->addWidget(m_btnAdd);
@@ -243,7 +243,7 @@ QWidget* MainWindow::makePresetsPanel()
 
 QWidget* MainWindow::makeDevicesPanel()
 {
-    auto* group  = new QGroupBox("Connected Devices", this);
+    auto* group  = new QGroupBox(tr("Connected Devices"), this);
     auto* layout = new QVBoxLayout(group);
 
     auto* scroll     = new QScrollArea(group);
@@ -252,8 +252,7 @@ QWidget* MainWindow::makeDevicesPanel()
     m_devicesLayout->setAlignment(Qt::AlignTop);
     m_devicesLayout->setSpacing(2);
 
-    m_noDevicesLbl = new QLabel("No NXP devices detected.\n"
-                                 "Connect a device in recovery / SDP mode.", container);
+    m_noDevicesLbl = new QLabel(tr("No NXP devices detected.\nConnect a device in recovery / SDP mode."), container);
     m_noDevicesLbl->setAlignment(Qt::AlignCenter);
     m_noDevicesLbl->setStyleSheet("color: gray; font-style: italic; padding: 20px;");
     m_devicesLayout->addWidget(m_noDevicesLbl);
@@ -273,7 +272,7 @@ QWidget* MainWindow::makeBottomBar()
     auto* layout = new QHBoxLayout(bar);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    m_autoFlash = new QCheckBox("Auto-flash on connect:", bar);
+    m_autoFlash = new QCheckBox(tr("Auto-flash on connect:"), bar);
     layout->addWidget(m_autoFlash);
 
     m_autoPreset = new QComboBox(bar);
@@ -283,12 +282,12 @@ QWidget* MainWindow::makeBottomBar()
 
     layout->addSpacing(16);
 
-    m_chkRebootAfter = new QCheckBox("Reboot after flash", bar);
+    m_chkRebootAfter = new QCheckBox(tr("Reboot after flash"), bar);
     layout->addWidget(m_chkRebootAfter);
 
     layout->addStretch();
 
-    m_btnFlashSel = new QPushButton("Flash Checked Devices", bar);
+    m_btnFlashSel = new QPushButton(tr("Flash Checked Devices"), bar);
     m_btnFlashSel->setFixedWidth(180);
     layout->addWidget(m_btnFlashSel);
 
@@ -354,7 +353,7 @@ void MainWindow::refreshUuuDropdown()
     m_uuuCombo->blockSignals(false);
 
     if (found.isEmpty()) {
-        m_statusBar->setText("uuu not found in PATH. Browse to set the path manually.");
+        m_statusBar->setText(tr("uuu not found in PATH. Browse to set the path manually."));
         m_statusBar->setStyleSheet("color: orange;");
     }
 }
@@ -362,11 +361,11 @@ void MainWindow::refreshUuuDropdown()
 void MainWindow::browseUuu()
 {
 #ifdef Q_OS_WIN
-    QString filter = "Executables (*.exe);;All files (*)";
+    QString filter = tr("Executables (*.exe);;All files (*)");
 #else
-    QString filter = "All files (*)";
+    QString filter = tr("All files (*)");
 #endif
-    QString path = QFileDialog::getOpenFileName(this, "Select uuu binary", {}, filter);
+    QString path = QFileDialog::getOpenFileName(this, tr("Select uuu binary"), {}, filter);
     if (path.isEmpty()) return;
 
     int idx = m_uuuCombo->findText(path);
@@ -381,7 +380,7 @@ void MainWindow::onUuuChanged(int)
 {
     QString path = currentUuuPath();
     if (path.isEmpty() || !QFileInfo::exists(path)) {
-        m_statusBar->setText(path.isEmpty() ? "" : "uuu binary not found at: " + path);
+        m_statusBar->setText(path.isEmpty() ? "" : tr("uuu binary not found at: ") + path);
         m_statusBar->setStyleSheet("color: red;");
         m_monitor->setUuuPath({}, {});
     } else {
@@ -485,8 +484,8 @@ void MainWindow::deletePreset()
     FirmwarePreset* p = selectedPreset();
     if (!p) return;
 
-    if (QMessageBox::question(this, "Delete preset",
-            QString("Delete preset \"%1\"?").arg(p->name)) != QMessageBox::Yes)
+    if (QMessageBox::question(this, tr("Delete preset"),
+            tr("Delete preset \"%1\"?").arg(p->name)) != QMessageBox::Yes)
         return;
 
     m_presets.removeIf([&](const FirmwarePreset& x){ return x.id == p->id; });
@@ -527,8 +526,8 @@ void MainWindow::addDeviceWidget(const UsbDevice& dev)
         if (w->isFlashing()) return;
         FirmwarePreset* p = selectedPreset();
         if (!p) {
-            QMessageBox::information(this, "No preset selected",
-                "Select a firmware preset from the list before flashing.");
+            QMessageBox::information(this, tr("No preset selected"),
+                tr("Select a firmware preset from the list before flashing."));
             return;
         }
         flashDevice(w);
@@ -553,7 +552,7 @@ void MainWindow::onDeviceConnected(UsbDevice dev)
         existing->deleteLater();
     }
     addDeviceWidget(dev);
-    m_statusBar->setText(QString("Device connected: %1").arg(dev.displayName()));
+    m_statusBar->setText(tr("Device connected: %1").arg(dev.displayName()));
 
     if (m_autoFlash->isChecked()) {
         QString autoId = m_autoPreset->currentData().toString();
@@ -575,12 +574,12 @@ void MainWindow::onDeviceDisconnected(QString busId)
     if (w->isFlashing()) {
         // Device rebooted mid-flash (normal after Phase 1 of multi-phase preset).
         // Keep the widget alive so FlashWorker can finish Phase 2.
-        m_statusBar->setText(QString("Device rebooting: %1").arg(w->device().displayName()));
+        m_statusBar->setText(tr("Device rebooting: %1").arg(w->device().displayName()));
         return;
     }
 
     m_deviceWidgets.remove(busId);
-    m_statusBar->setText(QString("Device disconnected: %1").arg(w->device().displayName()));
+    m_statusBar->setText(tr("Device disconnected: %1").arg(w->device().displayName()));
     m_devicesLayout->removeWidget(w);
     w->deleteLater();
 
@@ -590,9 +589,9 @@ void MainWindow::onDeviceDisconnected(QString busId)
 
 void MainWindow::onMonitoringUnavailable(QString reason)
 {
-    m_noDevicesLbl->setText("USB monitoring unavailable.\n" + reason);
+    m_noDevicesLbl->setText(tr("USB monitoring unavailable.\n%1").arg(reason));
     m_noDevicesLbl->setVisible(true);
-    m_statusBar->setText("USB monitoring unavailable — install libusb and rebuild.");
+    m_statusBar->setText(tr("USB monitoring unavailable — install libusb and rebuild."));
     m_statusBar->setStyleSheet("color: orange;");
 }
 
@@ -607,13 +606,13 @@ void MainWindow::flashDevice(DeviceItemWidget* widget)
 
     QString uuu = currentUuuPath();
     if (uuu.isEmpty() || !QFileInfo::exists(uuu)) {
-        QMessageBox::warning(this, "uuu not found", "Set a valid uuu binary path first.");
+        QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
         return;
     }
 
     if (!p->isValid()) {
-        QMessageBox::warning(this, "Invalid preset",
-            "The selected preset has missing or invalid files.");
+        QMessageBox::warning(this, tr("Invalid preset"),
+            tr("The selected preset has missing or invalid files."));
         return;
     }
 
@@ -626,14 +625,14 @@ void MainWindow::flashSelected()
 {
     FirmwarePreset* p = selectedPreset();
     if (!p) {
-        QMessageBox::information(this, "No preset",
-            "Select a firmware preset first.");
+        QMessageBox::information(this, tr("No preset"),
+            tr("Select a firmware preset first."));
         return;
     }
 
     QString uuu = currentUuuPath();
     if (uuu.isEmpty() || !QFileInfo::exists(uuu)) {
-        QMessageBox::warning(this, "uuu not found", "Set a valid uuu binary path first.");
+        QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
         return;
     }
 
@@ -649,8 +648,8 @@ void MainWindow::flashSelected()
     }
 
     if (!any)
-        QMessageBox::information(this, "Nothing to flash",
-            "Check at least one device in the list.");
+        QMessageBox::information(this, tr("Nothing to flash"),
+            tr("Check at least one device in the list."));
 }
 
 

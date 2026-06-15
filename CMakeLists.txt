@@ -74,6 +74,7 @@ else()
 endif()
 
 qt6_add_resources(uuuapp "resources" PREFIX "/" FILES icons/uuuapp.svg)
+qt6_add_resources(uuuapp "translations" PREFIX "/i18n" FILES translations/uuuapp_ru.qm)
 
 target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 
