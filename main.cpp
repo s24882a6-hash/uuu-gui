@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include <QApplication>
+#include <QIcon>
 #include <QPalette>
 #include <QStyleFactory>
 #ifdef Q_OS_WIN
@@ -50,6 +51,7 @@ int main(int argc, char* argv[])
     app.setApplicationName("UUU Flash Tool");
     app.setOrganizationName("uuuapp");
     app.setApplicationVersion("1.0.0");
+    app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
 
 #ifdef Q_OS_WIN
     if (windowsDarkModeEnabled())

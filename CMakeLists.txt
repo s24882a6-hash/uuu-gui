@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Svg)
 
 # --- libusb ---
 find_package(PkgConfig QUIET)
@@ -57,15 +57,25 @@ set(HEADERS
 )
 
 if(WIN32)
-    qt6_add_executable(uuuapp WIN32 ${SOURCES} ${HEADERS})
+    set(APP_ICON_WIN "${CMAKE_CURRENT_SOURCE_DIR}/icons/uuuapp.rc")
+    qt6_add_executable(uuuapp WIN32 ${SOURCES} ${HEADERS} ${APP_ICON_WIN})
 elseif(APPLE)
     set(MACOSX_BUNDLE_BUNDLE_NAME "UUU Flash Tool")
-    qt6_add_executable(uuuapp MACOSX_BUNDLE ${SOURCES} ${HEADERS})
+    set(APP_ICON_MACOS "${CMAKE_CURRENT_SOURCE_DIR}/icons/uuuapp.icns")
+    if(EXISTS "${APP_ICON_MACOS}")
+        set(MACOSX_BUNDLE_ICON_FILE uuuapp.icns)
+        set_source_files_properties(${APP_ICON_MACOS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+        qt6_add_executable(uuuapp MACOSX_BUNDLE ${SOURCES} ${HEADERS} ${APP_ICON_MACOS})
+    else()
+        qt6_add_executable(uuuapp MACOSX_BUNDLE ${SOURCES} ${HEADERS})
+    endif()
 else()
     qt6_add_executable(uuuapp ${SOURCES} ${HEADERS})
 endif()
 
-target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets)
+qt6_add_resources(uuuapp "resources" FILES icons/uuuapp.svg)
+
+target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 
 if(LIBUSB_FOUND)
     target_link_libraries(uuuapp PRIVATE PkgConfig::LIBUSB)

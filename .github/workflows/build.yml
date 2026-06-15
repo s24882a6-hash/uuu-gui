@@ -28,9 +28,8 @@ jobs:
 
       - name: Build AppImage
         run: |
-          convert -size 256x256 xc:#1565C0 \
-            -fill white -font DejaVu-Sans-Bold -pointsize 72 \
-            -gravity center -annotate 0 "UUU" uuuapp.png
+          sudo apt-get install -y librsvg2-bin
+          rsvg-convert -w 256 -h 256 icons/uuuapp.svg -o uuuapp.png
 
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
@@ -90,7 +89,16 @@ jobs:
           arch: clang_64
 
       - name: Install libusb
-        run: brew install libusb
+        run: brew install libusb librsvg
+
+      - name: Generate macOS icon
+        run: |
+          mkdir -p uuuapp.iconset
+          for size in 16 32 64 128 256 512; do
+            rsvg-convert -w $size -h $size icons/uuuapp.svg -o uuuapp.iconset/icon_${size}x${size}.png
+          done
+          rsvg-convert -w 1024 -h 1024 icons/uuuapp.svg -o uuuapp.iconset/icon_512x512@2x.png
+          iconutil -c icns uuuapp.iconset -o icons/uuuapp.icns
 
       - name: Build
         run: |
@@ -121,6 +129,16 @@ jobs:
 
       - name: Install libusb
         run: vcpkg install libusb --triplet x64-windows
+
+      - name: Generate Windows icon
+        run: |
+          choco install inkscape -y --no-progress
+          $sizes = @(16,32,48,64,128,256)
+          foreach ($s in $sizes) {
+            & "C:\Program Files\Inkscape\bin\inkscape.exe" --export-type=png --export-width=$s --export-filename="icon_$s.png" icons/uuuapp.svg
+          }
+          magick convert icon_256.png icon_128.png icon_64.png icon_48.png icon_32.png icon_16.png icons/uuuapp.ico
+        shell: pwsh
 
       - name: Build
         run: |
