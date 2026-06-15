@@ -17,7 +17,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev libusb-1.0-0-dev cmake build-essential \
             libgl-dev libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0
+            libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 \
+            qt6-gtk-platformtheme
 
       - name: Build
         run: |
@@ -35,6 +36,7 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
           export QMAKE=$(which qmake6 || which qmake)
+          export EXTRA_QT_PLUGINS=platformthemes/libqgtk3.so:styles/libqgtk3.so
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
