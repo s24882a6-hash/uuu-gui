@@ -7,78 +7,78 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            qt_arch: win64_msvc2019_64
-          - os: macos-latest
-            qt_arch: clang_64
-          - os: ubuntu-latest
-            qt_arch: gcc_64
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    runs-on: ${{ matrix.os }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev libusb-1.0-0-dev cmake build-essential
 
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-linux
+          path: build/uuuapp
+
+  build-macos:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.7.0'
-          arch: ${{ matrix.qt_arch }}
+          version: '6.8.0'
+          arch: clang_64
 
-      - name: Install libusb (macOS)
-        if: runner.os == 'macOS'
+      - name: Install libusb
         run: brew install libusb
 
-      - name: Install libusb (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y libusb-1.0-0-dev
-
-      - name: Install libusb (Windows)
-        if: runner.os == 'Windows'
-        run: vcpkg install libusb --triplet x64-windows
-
-      - name: Configure
-        run: >
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
-          ${{ runner.os == 'Windows' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
-
       - name: Build
-        run: cmake --build build --config Release
-
-      - name: Deploy (Windows)
-        if: runner.os == 'Windows'
         run: |
-          windeployqt build/Release/uuuapp.exe
-          mv build/Release uuu-gui-windows
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
 
-      - name: Deploy (macOS)
-        if: runner.os == 'macOS'
+      - name: Deploy
         run: |
           macdeployqt build/uuuapp.app -dmg
           mv build/uuuapp.dmg uuu-gui-macos.dmg
 
-      - name: Upload (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: uuu-gui-windows
-          path: uuu-gui-windows/
-
-      - name: Upload (macOS)
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: uuu-gui-macos
           path: uuu-gui-macos.dmg
 
-      - name: Upload (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
         with:
-          name: uuu-gui-linux
-          path: build/uuuapp
+          version: '6.8.0'
+          arch: win64_msvc2019_64
+
+      - name: Install libusb
+        run: vcpkg install libusb --triplet x64-windows
+
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake --build build --config Release
+
+      - name: Deploy
+        run: windeployqt build/Release/uuuapp.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-windows
+          path: build/Release/
