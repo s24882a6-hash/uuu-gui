@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=UUU Flash Tool
+Comment=NXP i.MX firmware flashing tool
+Exec=uuuapp
+Icon=uuuapp
+Categories=Development;Utility;
+Terminal=false

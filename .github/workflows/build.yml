@@ -1,0 +1,84 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            qt_arch: win64_msvc2019_64
+          - os: macos-latest
+            qt_arch: clang_64
+          - os: ubuntu-latest
+            qt_arch: gcc_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.0'
+          arch: ${{ matrix.qt_arch }}
+
+      - name: Install libusb (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libusb
+
+      - name: Install libusb (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libusb-1.0-0-dev
+
+      - name: Install libusb (Windows)
+        if: runner.os == 'Windows'
+        run: vcpkg install libusb --triplet x64-windows
+
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          ${{ runner.os == 'Windows' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Deploy (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          windeployqt build/Release/uuuapp.exe
+          mv build/Release uuu-gui-windows
+
+      - name: Deploy (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          macdeployqt build/uuuapp.app -dmg
+          mv build/uuuapp.dmg uuu-gui-macos.dmg
+
+      - name: Upload (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-windows
+          path: uuu-gui-windows/
+
+      - name: Upload (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-macos
+          path: uuu-gui-macos.dmg
+
+      - name: Upload (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-linux
+          path: build/uuuapp

@@ -1,0 +1,56 @@
+#pragma once
+#include "devicemonitor.h"
+#include "firmwarepreset.h"
+#include <QWidget>
+
+class QCheckBox;
+class QLabel;
+class QProgressBar;
+class QPushButton;
+class FlashWorker;
+class LogDialog;
+
+class DeviceItemWidget : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit DeviceItemWidget(const UsbDevice& device, QWidget* parent = nullptr);
+    ~DeviceItemWidget();
+
+    const UsbDevice& device() const { return m_device; }
+    bool isChecked() const;
+    bool isFlashing() const;
+
+    void flash(const QString& uuuPath,
+               const FirmwarePreset& preset,
+               const QString& sudoPrefix,
+               bool rebootAfter = false);
+    void reboot(const QString& uuuPath, const QString& sudoPrefix);
+    void cancelFlash();
+
+signals:
+    void checkStateChanged();
+    void flashRequested();
+    void flashDone(bool success);
+
+private slots:
+    void onProgress(int pct);
+    void onLogLine(const QString& line);
+    void onFlashFinished(bool success, const QString& err);
+    void showLog();
+
+private:
+    void setFlashingState(bool active);
+
+    UsbDevice       m_device;
+    FlashWorker*    m_worker    = nullptr;
+    LogDialog*      m_logDialog = nullptr;
+
+    QCheckBox*   m_check    = nullptr;
+    QLabel*      m_lblName  = nullptr;
+    QLabel*      m_lblStatus= nullptr;
+    QProgressBar* m_bar     = nullptr;
+    QLabel*      m_lblPct   = nullptr;
+    QPushButton* m_btnFlash = nullptr;
+    QPushButton* m_btnLog   = nullptr;
+};
