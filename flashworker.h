@@ -3,9 +3,7 @@
 #include "devicemonitor.h"
 #include <QObject>
 #include <QProcess>
-#include <QTemporaryFile>
-#include <QDir>
-#include <memory>
+#include <QTimer>
 
 class FlashWorker : public QObject
 {
@@ -36,13 +34,10 @@ signals:
 private slots:
     void onReadyRead();
     void onFinished(int exitCode, QProcess::ExitStatus status);
+    void startCurrentPhase();
 
 private:
-    // Single-phase: build the uuu command directly
-    QStringList buildCommand() const;
-    // Multi-phase: build a shell script that runs all phases sequentially
-    QString     buildShellScript() const;
-
+    QStringList buildPhaseCommand(int phaseIndex) const;
     void parseLine(const QString& line);
 
     QString            m_uuuPath;
@@ -50,13 +45,14 @@ private:
     UsbDevice          m_device;
     QString            m_sudoPrefix;
 
-    QProcess*                    m_process    = nullptr;
-    std::unique_ptr<QTemporaryFile> m_scriptFile;
-    QList<QStringList>           m_phases;
-    bool                         m_active            = false;
-    bool                         m_rebootAfterFlash  = false;
-    bool                         m_permissionError   = false;
-    int                          m_stepsDone  = 0;
-    int                          m_stepsTotal = 0;
-    bool                         m_lastWasCmd = false;
+    QProcess*          m_process           = nullptr;
+    QTimer*            m_phaseTimer        = nullptr;
+    QList<QStringList> m_phases;
+    int                m_currentPhase      = 0;
+    bool               m_active            = false;
+    bool               m_rebootAfterFlash  = false;
+    bool               m_permissionError   = false;
+    int                m_stepsDone         = 0;
+    int                m_stepsTotal        = 0;
+    bool               m_lastWasCmd        = false;
 };
