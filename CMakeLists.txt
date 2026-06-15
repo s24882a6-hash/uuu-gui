@@ -12,14 +12,18 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 # --- libusb ---
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBUSB libusb-1.0)
+    pkg_check_modules(LIBUSB IMPORTED_TARGET libusb-1.0)
 endif()
 
 if(NOT LIBUSB_FOUND)
-    find_library(LIBUSB_LIBRARIES NAMES usb-1.0 libusb-1.0 usb)
-    find_path(LIBUSB_INCLUDE_DIRS NAMES libusb.h PATH_SUFFIXES libusb-1.0)
-    if(LIBUSB_LIBRARIES AND LIBUSB_INCLUDE_DIRS)
+    find_library(LIBUSB_LIB NAMES usb-1.0 libusb-1.0 usb)
+    find_path(LIBUSB_INC NAMES libusb.h PATH_SUFFIXES libusb-1.0)
+    if(LIBUSB_LIB AND LIBUSB_INC)
         set(LIBUSB_FOUND TRUE)
+        add_library(PkgConfig::LIBUSB UNKNOWN IMPORTED)
+        set_target_properties(PkgConfig::LIBUSB PROPERTIES
+            IMPORTED_LOCATION "${LIBUSB_LIB}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INC}")
     endif()
 endif()
 
@@ -64,8 +68,7 @@ endif()
 target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets)
 
 if(LIBUSB_FOUND)
-    target_include_directories(uuuapp PRIVATE ${LIBUSB_INCLUDE_DIRS})
-    target_link_libraries(uuuapp PRIVATE ${LIBUSB_LIBRARIES})
+    target_link_libraries(uuuapp PRIVATE PkgConfig::LIBUSB)
     target_compile_definitions(uuuapp PRIVATE HAVE_LIBUSB)
 endif()
 
