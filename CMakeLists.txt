@@ -73,7 +73,7 @@ else()
     qt6_add_executable(uuuapp ${SOURCES} ${HEADERS})
 endif()
 
-qt6_add_resources(uuuapp "resources" FILES icons/uuuapp.svg)
+qt6_add_resources(uuuapp "resources" PREFIX "/" FILES icons/uuuapp.svg)
 
 target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 
