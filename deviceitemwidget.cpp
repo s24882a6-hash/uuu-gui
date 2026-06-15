@@ -4,6 +4,7 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QFrame>
@@ -88,11 +89,19 @@ void DeviceItemWidget::flash(const QString& uuuPath,
 {
     if (isFlashing()) return;
 
+    m_lastUuuPath     = uuuPath;
+    m_lastPreset      = preset;
+    m_lastSudoPrefix  = sudoPrefix;
+    m_lastRebootAfter = rebootAfter;
+
     if (!m_worker) {
         m_worker = new FlashWorker(this);
         connect(m_worker, &FlashWorker::progressChanged, this, &DeviceItemWidget::onProgress);
         connect(m_worker, &FlashWorker::logLine,         this, &DeviceItemWidget::onLogLine);
         connect(m_worker, &FlashWorker::finished,        this, &DeviceItemWidget::onFlashFinished);
+#ifdef Q_OS_LINUX
+        connect(m_worker, &FlashWorker::permissionError, this, &DeviceItemWidget::onPermissionError);
+#endif
     }
 
     m_worker->setUuuPath(uuuPath);
@@ -189,3 +198,28 @@ void DeviceItemWidget::setFlashingState(bool active)
     m_btnFlash->setText(active ? "Cancel" : "Flash");
     if (!active) { m_bar->setValue(0); m_lblPct->setText("0%"); }
 }
+
+#ifdef Q_OS_LINUX
+void DeviceItemWidget::onPermissionError()
+{
+    setFlashingState(false);
+
+    if (m_logDialog)
+        m_logDialog->appendLine("\n[ERROR] Permission denied accessing USB device.");
+
+    auto reply = QMessageBox::question(
+        this,
+        "Permission denied",
+        "Cannot open USB device — permission denied.\n\n"
+        "Retry with pkexec (a password dialog will appear)?",
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        flash(m_lastUuuPath, m_lastPreset, "pkexec", m_lastRebootAfter);
+    } else {
+        m_lblStatus->setText("Error");
+        m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
+        emit flashDone(false);
+    }
+}
+#endif

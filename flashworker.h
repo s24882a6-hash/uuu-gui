@@ -31,6 +31,7 @@ signals:
     void progressChanged(int percent);
     void logLine(QString line);
     void finished(bool success, QString errorMsg);
+    void permissionError();
 
 private slots:
     void onReadyRead();
@@ -54,6 +55,7 @@ private:
     QList<QStringList>           m_phases;
     bool                         m_active            = false;
     bool                         m_rebootAfterFlash  = false;
+    bool                         m_permissionError   = false;
     int                          m_stepsDone  = 0;
     int                          m_stepsTotal = 0;
     bool                         m_lastWasCmd = false;

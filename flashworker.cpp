@@ -101,13 +101,14 @@ void FlashWorker::start()
                 this, &FlashWorker::onFinished);
     }
 
-    m_phases     = m_preset.buildAllPhases();
+    m_phases          = m_preset.buildAllPhases();
     if (m_rebootAfterFlash)
         m_phases << QStringList{"FB:", "reboot"};
-    m_stepsDone  = 0;
-    m_stepsTotal = estimateSteps(m_preset);
-    m_active     = true;
-    m_lastWasCmd = false;
+    m_stepsDone       = 0;
+    m_stepsTotal      = estimateSteps(m_preset);
+    m_active          = true;
+    m_lastWasCmd      = false;
+    m_permissionError = false;
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert("TERM", "dumb");
@@ -223,6 +224,12 @@ void FlashWorker::onReadyRead()
 
 void FlashWorker::parseLine(const QString& line)
 {
+    if (line.contains("Failure open usb device", Qt::CaseInsensitive) ||
+        line.contains("Try sudo", Qt::CaseInsensitive))
+    {
+        m_permissionError = true;
+        return;
+    }
     // Progress from uuu: "0:12-xxx 1/ 2 [  48%  ] SDPS: ..."
     // Use [^\]]* to match any content inside brackets regardless of fill chars
     static const QRegularExpression rePercent(R"(\[[^\]]*?(\d+)%[^\]]*?\])");
@@ -247,6 +254,8 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
     if (success) {
         emit progressChanged(100);
         emit finished(true, {});
+    } else if (m_permissionError) {
+        emit permissionError();
     } else {
         QString errMsg = (status == QProcess::CrashExit)
             ? "uuu process crashed"

@@ -38,6 +38,9 @@ private slots:
     void onLogLine(const QString& line);
     void onFlashFinished(bool success, const QString& err);
     void showLog();
+#ifdef Q_OS_LINUX
+    void onPermissionError();
+#endif
 
 private:
     void setFlashingState(bool active);
@@ -45,6 +48,11 @@ private:
     UsbDevice       m_device;
     FlashWorker*    m_worker    = nullptr;
     LogDialog*      m_logDialog = nullptr;
+
+    QString        m_lastUuuPath;
+    FirmwarePreset m_lastPreset;
+    QString        m_lastSudoPrefix;
+    bool           m_lastRebootAfter = false;
 
     QCheckBox*   m_check    = nullptr;
     QLabel*      m_lblName  = nullptr;

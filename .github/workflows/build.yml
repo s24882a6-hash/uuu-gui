@@ -44,10 +44,39 @@ jobs:
             --icon-file uuuapp.png \
             --output appimage
 
+      - name: Package deb
+        run: |
+          sudo apt-get install -y alien
+          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
+                   deb/usr/share/icons/hicolor/256x256/apps
+          cp AppDir/usr/bin/uuuapp deb/usr/bin/
+          cp uuuapp.desktop        deb/usr/share/applications/
+          cp uuuapp.png            deb/usr/share/icons/hicolor/256x256/apps/uuuapp.png
+          cat > deb/DEBIAN/control << 'EOF'
+          Package: uuu-gui
+          Version: 1.0.0
+          Architecture: amd64
+          Maintainer: uuu-gui
+          Depends: libqt6widgets6, libusb-1.0-0
+          Description: NXP UUU firmware flashing GUI
+          EOF
+          dpkg-deb --build deb uuu-gui-amd64.deb
+          sudo alien --to-rpm --scripts uuu-gui-amd64.deb
+
       - uses: actions/upload-artifact@v4
         with:
-          name: uuu-gui-linux
+          name: uuu-gui-linux-appimage
           path: "*.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-linux-deb
+          path: "uuu-gui-amd64.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uuu-gui-linux-rpm
+          path: "*.rpm"
 
   build-macos:
     runs-on: macos-latest
