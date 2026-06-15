@@ -40,6 +40,7 @@ set(SOURCES
     mainwindow.cpp
     firmwarepreset.cpp
     presetdialog.cpp
+    settingsdialog.cpp
     devicemonitor.cpp
     flashworker.cpp
     deviceitemwidget.cpp
@@ -50,6 +51,7 @@ set(HEADERS
     mainwindow.h
     firmwarepreset.h
     presetdialog.h
+    settingsdialog.h
     devicemonitor.h
     flashworker.h
     deviceitemwidget.h
@@ -74,7 +76,7 @@ else()
 endif()
 
 qt6_add_resources(uuuapp "resources" PREFIX "/" FILES icons/uuuapp.svg)
-qt6_add_resources(uuuapp "translations" PREFIX "/i18n" FILES translations/uuuapp_ru.qm)
+target_sources(uuuapp PRIVATE translations/translations.qrc)
 
 target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 

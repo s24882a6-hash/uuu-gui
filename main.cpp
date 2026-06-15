@@ -5,8 +5,9 @@
 #include <QPalette>
 #include <QStyleFactory>
 #include <QTranslator>
+#include <QSettings>
 #ifdef Q_OS_WIN
-#  include <QSettings>
+// QSettings already included above
 #endif
 
 #ifdef Q_OS_WIN
@@ -55,11 +56,15 @@ int main(int argc, char* argv[])
     app.setApplicationVersion("1.0.0");
     app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
 
+    QSettings appSettings("uuuapp", "UUUFlashTool");
+    QString lang = appSettings.value("language", "").toString();
+    // Fall back to system locale on first launch
+    if (lang.isEmpty())
+        lang = (QLocale::system().language() == QLocale::Russian) ? "ru" : "en";
+
     QTranslator translator;
-    if (QLocale::system().language() == QLocale::Russian) {
-        if (translator.load(":/i18n/uuuapp_ru.qm"))
-            app.installTranslator(&translator);
-    }
+    if (lang == "ru" && translator.load(":/i18n/uuuapp_ru.qm"))
+        app.installTranslator(&translator);
 
 #ifdef Q_OS_WIN
     if (windowsDarkModeEnabled())

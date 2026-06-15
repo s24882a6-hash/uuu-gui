@@ -9,26 +9,6 @@
         <translation>UUU Flash Tool</translation>
     </message>
     <message>
-        <source>UUU Binary</source>
-        <translation>Бинарный файл UUU</translation>
-    </message>
-    <message>
-        <source>Path:</source>
-        <translation>Путь:</translation>
-    </message>
-    <message>
-        <source>Browse…</source>
-        <translation>Обзор…</translation>
-    </message>
-    <message>
-        <source>  Privilege:</source>
-        <translation>  Права:</translation>
-    </message>
-    <message>
-        <source>None (run as-is)</source>
-        <translation>Без прав</translation>
-    </message>
-    <message>
         <source>Firmware Presets</source>
         <translation>Пресеты прошивки</translation>
     </message>
@@ -55,6 +35,10 @@ Connect a device in recovery / SDP mode.</source>
 Подключите устройство в режиме recovery / SDP.</translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation>Настройки</translation>
+    </message>
+    <message>
         <source>Auto-flash on connect:</source>
         <translation>Авто-прошивка при подключении:</translation>
     </message>
@@ -67,20 +51,12 @@ Connect a device in recovery / SDP mode.</source>
         <translation>Прошить выбранные</translation>
     </message>
     <message>
-        <source>uuu not found in PATH. Browse to set the path manually.</source>
-        <translation>uuu не найден в PATH. Укажите путь вручную.</translation>
+        <source>Language changed</source>
+        <translation>Язык изменён</translation>
     </message>
     <message>
-        <source>Executables (*.exe);;All files (*)</source>
-        <translation>Исполняемые файлы (*.exe);;Все файлы (*)</translation>
-    </message>
-    <message>
-        <source>All files (*)</source>
-        <translation>Все файлы (*)</translation>
-    </message>
-    <message>
-        <source>Select uuu binary</source>
-        <translation>Выбрать файл uuu</translation>
+        <source>The language will change after restarting the application.</source>
+        <translation>Язык изменится после перезапуска приложения.</translation>
     </message>
     <message>
         <source>uuu binary not found at: </source>
@@ -155,6 +131,50 @@ Connect a device in recovery / SDP mode.</source>
     <message>
         <source>Check at least one device in the list.</source>
         <translation>Отметьте хотя бы одно устройство в списке.</translation>
+    </message>
+</context>
+
+<context>
+    <name>SettingsDialog</name>
+    <message>
+        <source>Settings</source>
+        <translation>Настройки</translation>
+    </message>
+    <message>
+        <source>UUU Binary</source>
+        <translation>Бинарный файл UUU</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Обзор…</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Основные</translation>
+    </message>
+    <message>
+        <source>Privilege:</source>
+        <translation>Права доступа:</translation>
+    </message>
+    <message>
+        <source>None (run as-is)</source>
+        <translation>Без прав</translation>
+    </message>
+    <message>
+        <source>Language:</source>
+        <translation>Язык:</translation>
+    </message>
+    <message>
+        <source>Select uuu binary</source>
+        <translation>Выбрать файл uuu</translation>
+    </message>
+    <message>
+        <source>Executables (*.exe);;All files (*)</source>
+        <translation>Исполняемые файлы (*.exe);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation>Все файлы (*)</translation>
     </message>
 </context>
 

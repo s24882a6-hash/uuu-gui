@@ -25,9 +25,8 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private slots:
-    // UUU binary
-    void browseUuu();
-    void onUuuChanged(int idx);
+    // Settings
+    void openSettings();
 
     // Presets
     void addPreset();
@@ -50,7 +49,6 @@ private slots:
 private:
     // --- Setup ---
     void setupUi();
-    QWidget* makeUuuBar();
     QWidget* makePresetsPanel();
     QWidget* makeDevicesPanel();
     QWidget* makeBottomBar();
@@ -61,32 +59,30 @@ private:
 
     // --- Helpers ---
     void refreshPresetList();
-    void refreshUuuDropdown();
-    QStringList findUuuBinaries();
-    QString     currentUuuPath() const;
-    QString     currentSudoPrefix() const;
+    void applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix);
     FirmwarePreset* selectedPreset();
     void addDeviceWidget(const UsbDevice& dev);
+
+    QString currentUuuPath()    const { return m_uuuPath;    }
+    QString currentSudoPrefix() const { return m_sudoPrefix; }
 
     // --- Data ---
     QList<FirmwarePreset> m_presets;
     DeviceMonitor*        m_monitor          = nullptr;
     int                   m_activeFlashCount = 0;
+    QString               m_uuuPath;
+    QString               m_sudoPrefix;
 
     // busId → widget
     QMap<QString, DeviceItemWidget*> m_deviceWidgets;
 
     // --- UI elements ---
-    QComboBox*   m_uuuCombo     = nullptr;
-    QPushButton* m_uuuBrowse    = nullptr;
-    QComboBox*   m_sudoCombo    = nullptr;   // "", "sudo", "pkexec"
-
     QListWidget* m_presetList   = nullptr;
     QPushButton* m_btnAdd       = nullptr;
     QPushButton* m_btnEdit      = nullptr;
     QPushButton* m_btnDelete    = nullptr;
 
-    QVBoxLayout* m_devicesLayout= nullptr;   // inside scroll area
+    QVBoxLayout* m_devicesLayout= nullptr;
     QLabel*      m_noDevicesLbl = nullptr;
 
     QCheckBox*   m_autoFlash        = nullptr;

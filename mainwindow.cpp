@@ -1,12 +1,12 @@
 #include "mainwindow.h"
 #include "presetdialog.h"
 #include "deviceitemwidget.h"
+#include "settingsdialog.h"
 
 #include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QCheckBox>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -24,9 +24,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QProcess>
 #include <QStandardPaths>
-#include <QDir>
 
 static constexpr int kPresetDescRole = Qt::UserRole + 1;
 
@@ -51,7 +49,6 @@ public:
 
     void paint(QPainter* p, const QStyleOptionViewItem& option, const QModelIndex& index) const override
     {
-        // Draw background/selection without text (clear it so base doesn't render it)
         QStyleOptionViewItem opt = option;
         initStyleOption(&opt, index);
         opt.text.clear();
@@ -113,15 +110,10 @@ MainWindow::MainWindow(QWidget* parent)
 
     setupUi();
     loadSettings();
-    refreshUuuDropdown();
     refreshPresetList();
 
-    // Prime the monitor with whatever uuu path was restored from settings
-    {
-        QString p = currentUuuPath();
-        if (!p.isEmpty() && QFileInfo::exists(p))
-            m_monitor->setUuuPath(p, currentSudoPrefix());
-    }
+    if (!m_uuuPath.isEmpty() && QFileInfo::exists(m_uuuPath))
+        m_monitor->setUuuPath(m_uuuPath, m_sudoPrefix);
 
     connect(m_monitor, &DeviceMonitor::deviceConnected,
             this, &MainWindow::onDeviceConnected);
@@ -131,6 +123,10 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onMonitoringUnavailable);
 
     m_monitor->start();
+
+    // Reflect loaded uuu path in status bar
+    if (!m_uuuPath.isEmpty())
+        applyUuuSettings(m_uuuPath, m_sudoPrefix);
 }
 
 MainWindow::~MainWindow()
@@ -145,8 +141,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// UI construction
-// ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::setupUi()
 {
@@ -156,8 +150,6 @@ void MainWindow::setupUi()
     auto* root = new QVBoxLayout(central);
     root->setSpacing(6);
     root->setContentsMargins(8, 8, 8, 8);
-
-    root->addWidget(makeUuuBar());
 
     auto* splitter = new QSplitter(Qt::Horizontal, central);
     splitter->addWidget(makePresetsPanel());
@@ -170,44 +162,6 @@ void MainWindow::setupUi()
 
     m_statusBar = new QLabel(this);
     statusBar()->addWidget(m_statusBar, 1);
-}
-
-QWidget* MainWindow::makeUuuBar()
-{
-    auto* bar    = new QGroupBox(tr("UUU Binary"), this);
-    auto* layout = new QHBoxLayout(bar);
-
-    layout->addWidget(new QLabel(tr("Path:"), bar));
-
-    m_uuuCombo = new QComboBox(bar);
-    m_uuuCombo->setEditable(true);
-    m_uuuCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    layout->addWidget(m_uuuCombo, 2);
-
-    m_uuuBrowse = new QPushButton(tr("Browse…"), bar);
-    m_uuuBrowse->setFixedWidth(80);
-    layout->addWidget(m_uuuBrowse);
-
-    layout->addWidget(new QLabel(tr("  Privilege:"), bar));
-    m_sudoCombo = new QComboBox(bar);
-    m_sudoCombo->addItem(tr("None (run as-is)"), "");
-#ifdef Q_OS_LINUX
-    m_sudoCombo->addItem("sudo",   "sudo");
-    m_sudoCombo->addItem("pkexec", "pkexec");
-#elif defined(Q_OS_MAC)
-    m_sudoCombo->addItem("sudo", "sudo");
-#endif
-    layout->addWidget(m_sudoCombo);
-
-    connect(m_uuuBrowse, &QPushButton::clicked,        this, &MainWindow::browseUuu);
-    connect(m_uuuCombo,  QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &MainWindow::onUuuChanged);
-    connect(m_uuuCombo,  &QComboBox::editTextChanged,
-            this, [this](const QString&){ onUuuChanged(0); });
-    connect(m_sudoCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this](int){ onUuuChanged(0); });
-
-    return bar;
 }
 
 QWidget* MainWindow::makePresetsPanel()
@@ -272,6 +226,12 @@ QWidget* MainWindow::makeBottomBar()
     auto* layout = new QHBoxLayout(bar);
     layout->setContentsMargins(0, 0, 0, 0);
 
+    auto* btnSettings = new QPushButton(tr("Settings"), bar);
+    btnSettings->setFixedWidth(90);
+    layout->addWidget(btnSettings);
+
+    layout->addSpacing(12);
+
     m_autoFlash = new QCheckBox(tr("Auto-flash on connect:"), bar);
     layout->addWidget(m_autoFlash);
 
@@ -291,117 +251,51 @@ QWidget* MainWindow::makeBottomBar()
     m_btnFlashSel->setFixedWidth(180);
     layout->addWidget(m_btnFlashSel);
 
-    connect(m_autoFlash,   &QCheckBox::toggled,   this, &MainWindow::onAutoFlashToggled);
-    connect(m_btnFlashSel, &QPushButton::clicked, this, &MainWindow::flashSelected);
+    connect(btnSettings,   &QPushButton::clicked,  this, &MainWindow::openSettings);
+    connect(m_autoFlash,   &QCheckBox::toggled,    this, &MainWindow::onAutoFlashToggled);
+    connect(m_btnFlashSel, &QPushButton::clicked,  this, &MainWindow::flashSelected);
 
     return bar;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// UUU binary handling
-// ──────────────────────────────────────────────────────────────────────────────
 
-QStringList MainWindow::findUuuBinaries()
+void MainWindow::openSettings()
 {
-    QStringList candidates;
+    SettingsDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted) return;
 
-    // QStandardPaths::findExecutable searches PATH cross-platform (no "which" on Windows)
-    QString inPath = QStandardPaths::findExecutable("uuu");
-    if (!inPath.isEmpty()) candidates << inPath;
+    QString newLang = dlg.language();
+    QSettings s("uuuapp", "UUUFlashTool");
+    QString oldLang = s.value("language", "en").toString();
 
-#ifdef Q_OS_WIN
-    QStringList winPaths = {
-        "C:/Program Files/uuu/uuu.exe",
-        "C:/uuu/uuu.exe"
-    };
-    for (const auto& wp : winPaths)
-        if (QFileInfo::exists(wp)) candidates << wp;
-#elif defined(Q_OS_MAC)
-    QStringList macPaths = {
-        "/usr/local/bin/uuu",
-        "/opt/homebrew/bin/uuu"
-    };
-    for (const auto& mp : macPaths)
-        if (QFileInfo::exists(mp) && !candidates.contains(mp)) candidates << mp;
-#else
-    QStringList linuxPaths = {
-        "/usr/local/bin/uuu",
-        "/usr/bin/uuu"
-    };
-    for (const auto& lp : linuxPaths)
-        if (QFileInfo::exists(lp) && !candidates.contains(lp)) candidates << lp;
-#endif
+    s.setValue("language",    newLang);
+    s.setValue("sudoPrefix",  dlg.privilegePrefix());
+    s.setValue("uuuPath",     dlg.uuuPath());
 
-    return candidates;
+    applyUuuSettings(dlg.uuuPath(), dlg.privilegePrefix());
+
+    if (newLang != oldLang)
+        QMessageBox::information(this, tr("Language changed"),
+            tr("The language will change after restarting the application."));
 }
 
-void MainWindow::refreshUuuDropdown()
+void MainWindow::applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix)
 {
-    QStringList found = findUuuBinaries();
-    QString current   = m_uuuCombo->currentText();
+    m_uuuPath    = uuuPath;
+    m_sudoPrefix = sudoPrefix;
 
-    m_uuuCombo->blockSignals(true);
-    m_uuuCombo->clear();
-    for (const auto& p : found)
-        m_uuuCombo->addItem(p);
-
-    if (!current.isEmpty()) {
-        int idx = m_uuuCombo->findText(current);
-        if (idx >= 0) m_uuuCombo->setCurrentIndex(idx);
-        else          m_uuuCombo->setEditText(current);
-    }
-    m_uuuCombo->blockSignals(false);
-
-    if (found.isEmpty()) {
-        m_statusBar->setText(tr("uuu not found in PATH. Browse to set the path manually."));
-        m_statusBar->setStyleSheet("color: orange;");
-    }
-}
-
-void MainWindow::browseUuu()
-{
-#ifdef Q_OS_WIN
-    QString filter = tr("Executables (*.exe);;All files (*)");
-#else
-    QString filter = tr("All files (*)");
-#endif
-    QString path = QFileDialog::getOpenFileName(this, tr("Select uuu binary"), {}, filter);
-    if (path.isEmpty()) return;
-
-    int idx = m_uuuCombo->findText(path);
-    if (idx < 0) {
-        m_uuuCombo->addItem(path);
-        idx = m_uuuCombo->count() - 1;
-    }
-    m_uuuCombo->setCurrentIndex(idx);
-}
-
-void MainWindow::onUuuChanged(int)
-{
-    QString path = currentUuuPath();
-    if (path.isEmpty() || !QFileInfo::exists(path)) {
-        m_statusBar->setText(path.isEmpty() ? "" : tr("uuu binary not found at: ") + path);
+    if (uuuPath.isEmpty() || !QFileInfo::exists(uuuPath)) {
+        m_statusBar->setText(uuuPath.isEmpty() ? "" : tr("uuu binary not found at: ") + uuuPath);
         m_statusBar->setStyleSheet("color: red;");
         m_monitor->setUuuPath({}, {});
     } else {
-        m_statusBar->setText("uuu: " + path);
+        m_statusBar->setText("uuu: " + uuuPath);
         m_statusBar->setStyleSheet("color: green;");
-        m_monitor->setUuuPath(path, currentSudoPrefix());
+        m_monitor->setUuuPath(uuuPath, sudoPrefix);
     }
 }
 
-QString MainWindow::currentUuuPath() const
-{
-    return m_uuuCombo->currentText().trimmed();
-}
-
-QString MainWindow::currentSudoPrefix() const
-{
-    return m_sudoCombo->currentData().toString();
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Preset management
 // ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::refreshPresetList()
@@ -435,7 +329,6 @@ void MainWindow::refreshPresetList()
         item->setData(kPresetDescRole, descLines.join("\n"));
     }
 
-    // Restore or auto-select first item
     bool restored = false;
     if (!selectedId.isEmpty()) {
         for (int i = 0; i < m_presetList->count(); ++i) {
@@ -449,7 +342,6 @@ void MainWindow::refreshPresetList()
     if (!restored && m_presetList->count() > 0)
         m_presetList->setCurrentRow(0);
 
-    // Refresh auto-preset combo
     QString autoId = m_autoPreset->currentData().toString();
     m_autoPreset->clear();
     for (const auto& p : m_presets)
@@ -511,8 +403,6 @@ FirmwarePreset* MainWindow::selectedPreset()
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Device handling
-// ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::addDeviceWidget(const UsbDevice& dev)
 {
@@ -546,7 +436,6 @@ void MainWindow::onDeviceConnected(UsbDevice dev)
     auto* existing = m_deviceWidgets.value(dev.busId);
     if (existing) {
         if (existing->isFlashing()) return;
-        // Stale widget from a previous flash — replace it
         m_deviceWidgets.remove(dev.busId);
         m_devicesLayout->removeWidget(existing);
         existing->deleteLater();
@@ -559,7 +448,7 @@ void MainWindow::onDeviceConnected(UsbDevice dev)
         for (auto& p : m_presets) {
             if (p.id == autoId) {
                 auto* w = m_deviceWidgets.value(dev.busId);
-                if (w) w->flash(currentUuuPath(), p, currentSudoPrefix(), m_chkRebootAfter->isChecked());
+                if (w) w->flash(m_uuuPath, p, m_sudoPrefix, m_chkRebootAfter->isChecked());
                 break;
             }
         }
@@ -572,8 +461,6 @@ void MainWindow::onDeviceDisconnected(QString busId)
     if (!w) return;
 
     if (w->isFlashing()) {
-        // Device rebooted mid-flash (normal after Phase 1 of multi-phase preset).
-        // Keep the widget alive so FlashWorker can finish Phase 2.
         m_statusBar->setText(tr("Device rebooting: %1").arg(w->device().displayName()));
         return;
     }
@@ -596,16 +483,13 @@ void MainWindow::onMonitoringUnavailable(QString reason)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Flash
-// ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::flashDevice(DeviceItemWidget* widget)
 {
     FirmwarePreset* p = selectedPreset();
     if (!p) return;
 
-    QString uuu = currentUuuPath();
-    if (uuu.isEmpty() || !QFileInfo::exists(uuu)) {
+    if (m_uuuPath.isEmpty() || !QFileInfo::exists(m_uuuPath)) {
         QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
         return;
     }
@@ -618,7 +502,7 @@ void MainWindow::flashDevice(DeviceItemWidget* widget)
 
     ++m_activeFlashCount;
     m_monitor->setOpenAllowed(false);
-    widget->flash(uuu, *p, currentSudoPrefix(), m_chkRebootAfter->isChecked());
+    widget->flash(m_uuuPath, *p, m_sudoPrefix, m_chkRebootAfter->isChecked());
 }
 
 void MainWindow::flashSelected()
@@ -630,8 +514,7 @@ void MainWindow::flashSelected()
         return;
     }
 
-    QString uuu = currentUuuPath();
-    if (uuu.isEmpty() || !QFileInfo::exists(uuu)) {
+    if (m_uuuPath.isEmpty() || !QFileInfo::exists(m_uuuPath)) {
         QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
         return;
     }
@@ -643,7 +526,7 @@ void MainWindow::flashSelected()
         if (!item || !item->widget()) continue;
         auto* w = qobject_cast<DeviceItemWidget*>(item->widget());
         if (!w || !w->isChecked() || w->isFlashing()) continue;
-        w->flash(uuu, *p, currentSudoPrefix(), reboot);
+        w->flash(m_uuuPath, *p, m_sudoPrefix, reboot);
         any = true;
     }
 
@@ -652,38 +535,23 @@ void MainWindow::flashSelected()
             tr("Check at least one device in the list."));
 }
 
-
 void MainWindow::onAutoFlashToggled(bool enabled)
 {
     m_autoPreset->setEnabled(enabled);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Persistence (QSettings, JSON)
-// ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::loadSettings()
 {
     QSettings s("uuuapp", "UUUFlashTool");
 
-    // UUU path
-    QString savedUuu = s.value("uuuPath").toString();
-    if (!savedUuu.isEmpty()) {
-        if (m_uuuCombo->findText(savedUuu) < 0)
-            m_uuuCombo->addItem(savedUuu);
-        m_uuuCombo->setCurrentText(savedUuu);
-    }
+    m_uuuPath    = s.value("uuuPath").toString();
+    m_sudoPrefix = s.value("sudoPrefix").toString();
 
-    // Sudo prefix
-    QString savedPrefix = s.value("sudoPrefix").toString();
-    int pidx = m_sudoCombo->findData(savedPrefix);
-    if (pidx >= 0) m_sudoCombo->setCurrentIndex(pidx);
-
-    // Auto-flash
     m_autoFlash->setChecked(s.value("autoFlash", false).toBool());
     m_chkRebootAfter->setChecked(s.value("rebootAfterFlash", false).toBool());
 
-    // Presets
     QByteArray presetsJson = s.value("presets").toByteArray();
     if (!presetsJson.isEmpty()) {
         QJsonDocument doc = QJsonDocument::fromJson(presetsJson);
@@ -697,8 +565,8 @@ void MainWindow::loadSettings()
 void MainWindow::saveSettings()
 {
     QSettings s("uuuapp", "UUUFlashTool");
-    s.setValue("uuuPath",    currentUuuPath());
-    s.setValue("sudoPrefix", currentSudoPrefix());
+    s.setValue("uuuPath",          m_uuuPath);
+    s.setValue("sudoPrefix",       m_sudoPrefix);
     s.setValue("autoFlash",        m_autoFlash->isChecked());
     s.setValue("rebootAfterFlash", m_chkRebootAfter->isChecked());
 
