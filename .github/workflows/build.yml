@@ -8,24 +8,39 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libusb-1.0-0-dev cmake build-essential
+          sudo apt-get install -y qt6-base-dev libusb-1.0-0-dev cmake build-essential \
+            libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0
 
       - name: Build
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build
+          DESTDIR=AppDir cmake --install build
+
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          export QMAKE=$(which qmake6 || which qmake)
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --desktop-file uuuapp.desktop \
+            --output appimage
 
       - uses: actions/upload-artifact@v4
         with:
           name: uuu-gui-linux
-          path: build/uuuapp
+          path: uuu-gui-*.AppImage
 
   build-macos:
     runs-on: macos-latest
