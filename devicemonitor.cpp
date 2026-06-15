@@ -81,21 +81,11 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaUuu()
     if (uuuPath.isEmpty()) return result;
 
     QProcess proc;
-    QString program;
-    QStringList args;
-#ifdef Q_OS_WIN
-    program = uuuPath;
-    args << "-lsusb";
-#else
-    if (!sudoPrefix.isEmpty()) {
-        program = sudoPrefix;
-        args << uuuPath << "-lsusb";
-    } else {
-        program = uuuPath;
-        args << "-lsusb";
-    }
-#endif
-    proc.start(program, args);
+    // Always scan without privilege prefix — listing devices doesn't need root,
+    // and sudo/pkexec without a terminal would block waiting for a password.
+    proc.setProgram(uuuPath);
+    proc.setArguments({"-lsusb"});
+    proc.start();
     if (!proc.waitForFinished(3000)) {
         proc.kill();
         return result;
