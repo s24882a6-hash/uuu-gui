@@ -68,8 +68,9 @@ jobs:
 
       - name: Deploy
         run: |
-          macdeployqt build/uuuapp.app -dmg
-          mv build/uuuapp.dmg uuu-gui-macos.dmg
+          macdeployqt build/uuuapp.app
+          codesign --force --deep --sign - build/uuuapp.app
+          hdiutil create -volname uuu-gui -srcfolder build/uuuapp.app -ov -format UDZO uuu-gui-macos.dmg
 
       - uses: actions/upload-artifact@v4
         with:
