@@ -1,6 +1,7 @@
 #include "deviceitemwidget.h"
 #include "flashworker.h"
 #include "logdialog.h"
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
@@ -32,6 +33,13 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     m_lblStatus = new QLabel(tr("Idle"), this);
     m_lblStatus->setFixedWidth(80);
     layout->addWidget(m_lblStatus);
+
+    m_lblPhase = new QLabel(this);
+    m_lblPhase->setFixedWidth(30);
+    m_lblPhase->setAlignment(Qt::AlignCenter);
+    m_lblPhase->setStyleSheet("color: gray; font-size: 10px;");
+    m_lblPhase->setVisible(false);
+    layout->addWidget(m_lblPhase);
 
     m_bar = new QProgressBar(this);
     m_bar->setRange(0, 100);
@@ -97,6 +105,7 @@ void DeviceItemWidget::flash(const QString& uuuPath,
     if (!m_worker) {
         m_worker = new FlashWorker(this);
         connect(m_worker, &FlashWorker::progressChanged, this, &DeviceItemWidget::onProgress);
+        connect(m_worker, &FlashWorker::phaseChanged,    this, &DeviceItemWidget::onPhaseChanged);
         connect(m_worker, &FlashWorker::logLine,         this, &DeviceItemWidget::onLogLine);
         connect(m_worker, &FlashWorker::finished,        this, &DeviceItemWidget::onFlashFinished);
 #ifdef Q_OS_LINUX
@@ -149,10 +158,36 @@ void DeviceItemWidget::cancelFlash()
     if (m_worker) m_worker->cancel();
 }
 
+void DeviceItemWidget::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange)
+        retranslateUi();
+    QWidget::changeEvent(event);
+}
+
+void DeviceItemWidget::retranslateUi()
+{
+    m_btnLog->setText(tr("Logs"));
+    // Re-apply flashing state so buttons/labels get correct translated text
+    setFlashingState(isFlashing());
+}
+
 void DeviceItemWidget::onProgress(int pct)
 {
     m_bar->setValue(pct);
     m_lblPct->setText(QString("%1%").arg(pct));
+}
+
+void DeviceItemWidget::onPhaseChanged(int current, int total)
+{
+    m_bar->setValue(0);
+    m_lblPct->setText("0%");
+    if (total > 1) {
+        m_lblPhase->setText(QString("%1/%2").arg(current).arg(total));
+        m_lblPhase->setVisible(true);
+    } else {
+        m_lblPhase->setVisible(false);
+    }
 }
 
 void DeviceItemWidget::onLogLine(const QString& line)
@@ -196,7 +231,7 @@ void DeviceItemWidget::setFlashingState(bool active)
     m_lblStatus->setText(active ? tr("Flashing…") : tr("Idle"));
     m_lblStatus->setStyleSheet(active ? "color: orange; font-weight: bold;" : "");
     m_btnFlash->setText(active ? tr("Cancel") : tr("Flash"));
-    if (!active) { m_bar->setValue(0); m_lblPct->setText("0%"); }
+    if (!active) { m_bar->setValue(0); m_lblPct->setText("0%"); m_lblPhase->setVisible(false); }
 }
 
 #ifdef Q_OS_LINUX

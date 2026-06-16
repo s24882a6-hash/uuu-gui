@@ -3,6 +3,7 @@
 #include "devicemonitor.h"
 #include <QMainWindow>
 #include <QMap>
+#include <QTranslator>
 
 class QListWidget;
 class QListWidgetItem;
@@ -23,6 +24,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
 private slots:
     // Settings
@@ -59,6 +61,8 @@ private:
 
     // --- Helpers ---
     void refreshPresetList();
+    void retranslateUi();
+    void applyLanguage(const QString& lang);
     void applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix);
     FirmwarePreset* selectedPreset();
     void addDeviceWidget(const UsbDevice& dev);
@@ -72,11 +76,14 @@ private:
     int                   m_activeFlashCount = 0;
     QString               m_uuuPath;
     QString               m_sudoPrefix;
+    QTranslator           m_translator;
 
     // busId → widget
     QMap<QString, DeviceItemWidget*> m_deviceWidgets;
 
     // --- UI elements ---
+    class QGroupBox* m_groupPresets = nullptr;
+    class QGroupBox* m_groupDevices = nullptr;
     QListWidget* m_presetList   = nullptr;
     QPushButton* m_btnAdd       = nullptr;
     QPushButton* m_btnEdit      = nullptr;
@@ -85,6 +92,7 @@ private:
     QVBoxLayout* m_devicesLayout= nullptr;
     QLabel*      m_noDevicesLbl = nullptr;
 
+    QPushButton* m_btnSettings      = nullptr;
     QCheckBox*   m_autoFlash        = nullptr;
     QComboBox*   m_autoPreset       = nullptr;
     QCheckBox*   m_chkRebootAfter   = nullptr;

@@ -1,45 +1,7 @@
 #include "flashworker.h"
-#include <QPointer>
 #include <QRegularExpression>
 #include <QProcessEnvironment>
-#include <functional>
-#include <utility>
-
-// ---------------------------------------------------------------------------
-// Multi-device phase coordinator
-//
-// Phase 0 targets one specific device via -m busId.
-// Phase 1+ (e.g. "uuu -b emmc_all ...") has no -m and flashes ALL connected
-// FastBoot devices at once. If two workers reach Phase 1 simultaneously they
-// race for the same physical devices and one of them fails.
-//
-// Fix: only ONE worker is allowed to run Phase 1+ at a time. Others register
-// a callback and are notified with the outcome when the first one finishes.
-// ---------------------------------------------------------------------------
-namespace {
-static bool g_sharedPhaseLocked = false;
-static QList<std::function<void(bool)>> g_sharedPhaseWaiters;
-
-bool tryAcquireSharedLock()
-{
-    if (g_sharedPhaseLocked) return false;
-    g_sharedPhaseLocked = true;
-    return true;
-}
-
-void releaseSharedLock(bool success)
-{
-    g_sharedPhaseLocked = false;
-    auto waiters = std::exchange(g_sharedPhaseWaiters, {});
-    for (auto& cb : waiters)
-        cb(success);
-}
-
-void waitForSharedLock(std::function<void(bool)> cb)
-{
-    g_sharedPhaseWaiters.append(std::move(cb));
-}
-} // namespace
+#include <QProcess>
 
 static int estimateSteps(const FirmwarePreset& p)
 {
@@ -68,9 +30,7 @@ QStringList FlashWorker::buildPhaseCommand(int phaseIndex) const
         cmd << m_sudoPrefix;
 #endif
     cmd << m_uuuPath;
-    // Target the specific device on Phase 1 only; after re-enumeration
-    // the bus address changes so we let uuu find it automatically.
-    if (phaseIndex == 0 && !m_device.busId.isEmpty())
+    if (!m_device.busId.isEmpty())
         cmd << "-m" << m_device.uuuDevArg();
     cmd << m_phases[phaseIndex];
     return cmd;
@@ -101,40 +61,79 @@ void FlashWorker::start()
     m_currentPhase    = 0;
     m_stepsDone       = 0;
     m_stepsTotal      = estimateSteps(m_preset);
-    m_active          = true;
-    m_lastWasCmd      = false;
-    m_permissionError = false;
+    m_active            = true;
+    m_lastWasCmd        = false;
+    m_permissionError   = false;
+    m_busIdScanRetries  = 0;
 
     startCurrentPhase();
 }
 
+// Scan uuu -lsusb and return the bus path of our device in Fastboot mode.
+// Returns empty string if not found yet (device still transitioning).
+QString FlashWorker::scanForFastbootBusId() const
+{
+    if (m_uuuPath.isEmpty() || m_device.serialNumber.isEmpty())
+        return {};
+
+    QProcess proc;
+    proc.setProgram(m_uuuPath);
+    proc.setArguments({"-lsusb"});
+    proc.start();
+    if (!proc.waitForFinished(3000)) {
+        proc.kill();
+        return {};
+    }
+
+    const QString output = QString::fromLocal8Bit(
+        proc.readAllStandardOutput() + proc.readAllStandardError());
+
+    static const QRegularExpression reSpaces(R"(\s+)");
+    bool pastHeader = false;
+
+    for (const QString& rawLine : output.split('\n')) {
+        const QString line = rawLine.trimmed();
+        if (line.startsWith("====")) { pastHeader = true; continue; }
+        if (!pastHeader || line.isEmpty()) continue;
+        if (!line.contains("FB:")) continue;  // only fastboot-mode devices
+
+        const QStringList fields = line.split(reSpaces, Qt::SkipEmptyParts);
+        if (fields.size() < 2 || !fields[0].contains(':')) continue;
+
+        if (fields.contains(m_device.serialNumber))
+            return fields[0];
+    }
+    return {};
+}
+
 void FlashWorker::startCurrentPhase()
 {
-    // Phase 1+ runs without -m and flashes ALL connected FastBoot devices.
-    // Coordinate so only one worker runs these phases at a time.
-    if (m_currentPhase > 0 && m_phases.size() > 1) {
-        if (!tryAcquireSharedLock()) {
-            // Another worker is already running Phase 2+ for all devices.
-            // It will flash our device too — just wait for the result.
-            emit logLine(tr("--- Phase %1/%2 ---").arg(m_currentPhase + 1).arg(m_phases.size()));
-            emit logLine(tr("(Waiting — another worker is handling this phase for all devices)"));
-            waitForSharedLock([wp = QPointer<FlashWorker>(this)](bool success) {
-                if (!wp) return;
-                wp->m_active = false;
-                if (success) {
-                    emit wp->progressChanged(100);
-                    emit wp->finished(true, {});
-                } else {
-                    emit wp->finished(false, FlashWorker::tr("Flash failed (see other device log)"));
-                }
-            });
-            return;
+    // For phase 2+, device re-enumerates after SDP boot and may get a new bus path.
+    // Scan lsusb to find the new path by serial number before launching uuu.
+    if (m_currentPhase > 0 && !m_device.serialNumber.isEmpty()) {
+        QString newBusId = scanForFastbootBusId();
+        if (newBusId.isEmpty()) {
+            // Device not in fastboot yet — retry in 1 second
+            if (m_busIdScanRetries < 15) {
+                ++m_busIdScanRetries;
+                m_phaseTimer->start(1000);
+                return;
+            }
+            // Gave up — proceed with original bus ID; uuu will wait for it
+            emit logLine(tr("Warning: device not found in fastboot mode after re-enumeration"));
+        } else {
+            if (newBusId != m_device.busId) {
+                emit logLine(QString("Device re-enumerated: %1 → %2").arg(m_device.busId, newBusId));
+                m_device.busId = newBusId;
+            }
         }
-        m_holdsSharedLock = true;
+        m_busIdScanRetries = 0;
     }
 
     QStringList fullCmd = buildPhaseCommand(m_currentPhase);
     QString program = fullCmd.takeFirst();
+
+    emit phaseChanged(m_currentPhase + 1, m_phases.size());
 
     if (m_phases.size() > 1)
         emit logLine(QString("--- Phase %1/%2 ---").arg(m_currentPhase + 1).arg(m_phases.size()));
@@ -148,7 +147,6 @@ void FlashWorker::startCurrentPhase()
 
     if (!m_process->waitForStarted(3000)) {
         m_active = false;
-        if (m_holdsSharedLock) { m_holdsSharedLock = false; releaseSharedLock(false); }
         emit finished(false, QString("Failed to start: %1").arg(m_process->errorString()));
     }
 }
@@ -223,19 +221,6 @@ void FlashWorker::onReadyRead()
     }
 }
 
-void FlashWorker::emitScaledProgress(int phasePct)
-{
-    // Map each phase to its own slice of 0-100%
-    int total = m_phases.size();
-    if (total <= 1) {
-        emit progressChanged(qMin(99, phasePct));
-        return;
-    }
-    int sliceW = 100 / total;
-    int scaled = m_currentPhase * sliceW + phasePct * sliceW / 100;
-    emit progressChanged(qMin(99, scaled));
-}
-
 void FlashWorker::parseLine(const QString& line)
 {
     if (line.contains("Failure open usb device", Qt::CaseInsensitive) ||
@@ -249,7 +234,7 @@ void FlashWorker::parseLine(const QString& line)
     static const QRegularExpression rePercent(R"(\[[^\]]*?(\d+)%[^\]]*?\])");
     QRegularExpressionMatch m = rePercent.match(line);
     if (m.hasMatch()) {
-        emitScaledProgress(m.captured(1).toInt());
+        emit progressChanged(qMin(99, m.captured(1).toInt()));
         return;
     }
 
@@ -257,12 +242,12 @@ void FlashWorker::parseLine(const QString& line)
     static const QRegularExpression rePercentVerbose(R"(^(\d+)%$)");
     QRegularExpressionMatch m2 = rePercentVerbose.match(line);
     if (m2.hasMatch()) {
-        emitScaledProgress(m2.captured(1).toInt());
+        emit progressChanged(qMin(99, m2.captured(1).toInt()));
         return;
     }
 
     if (line.contains("[Done", Qt::CaseInsensitive)) {
-        emitScaledProgress(99);
+        emit progressChanged(99);
         return;
     }
 }
@@ -275,14 +260,12 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
 
     if (!phaseOk && m_permissionError) {
         m_active = false;
-        if (m_holdsSharedLock) { m_holdsSharedLock = false; releaseSharedLock(false); }
         emit permissionError();
         return;
     }
 
     if (!phaseOk) {
         m_active = false;
-        if (m_holdsSharedLock) { m_holdsSharedLock = false; releaseSharedLock(false); }
         QString errMsg = (status == QProcess::CrashExit)
             ? "uuu process crashed"
             : QString("uuu exited with code %1").arg(exitCode);
@@ -292,9 +275,7 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
 
     m_currentPhase++;
     if (m_currentPhase >= m_phases.size()) {
-        // All phases done
         m_active = false;
-        if (m_holdsSharedLock) { m_holdsSharedLock = false; releaseSharedLock(true); }
         emit progressChanged(100);
         emit finished(true, {});
         return;

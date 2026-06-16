@@ -4,6 +4,8 @@
 #include "settingsdialog.h"
 
 #include <QApplication>
+#include <QEvent>
+#include <QGroupBox>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QCheckBox>
@@ -140,6 +142,36 @@ void MainWindow::closeEvent(QCloseEvent* event)
     event->accept();
 }
 
+void MainWindow::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange)
+        retranslateUi();
+    QMainWindow::changeEvent(event);
+}
+
+void MainWindow::retranslateUi()
+{
+    setWindowTitle(tr("UUU Flash Tool"));
+    if (m_groupPresets) m_groupPresets->setTitle(tr("Firmware Presets"));
+    if (m_groupDevices) m_groupDevices->setTitle(tr("Connected Devices"));
+    m_btnAdd->setText(tr("+  Add"));
+    m_btnEdit->setText(tr("Edit"));
+    m_btnDelete->setText(tr("Delete"));
+    m_noDevicesLbl->setText(tr("No NXP devices detected.\nConnect a device in recovery / SDP mode."));
+    m_btnSettings->setText(tr("Settings"));
+    m_autoFlash->setText(tr("Auto-flash on connect:"));
+    m_chkRebootAfter->setText(tr("Reboot after flash"));
+    m_btnFlashSel->setText(tr("Flash Checked Devices"));
+}
+
+void MainWindow::applyLanguage(const QString& lang)
+{
+    qApp->removeTranslator(&m_translator);
+    if (lang == "ru" && m_translator.load(":/i18n/uuuapp_ru.qm"))
+        qApp->installTranslator(&m_translator);
+    // Qt sends LanguageChange to all widgets automatically
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::setupUi()
@@ -166,8 +198,10 @@ void MainWindow::setupUi()
 
 QWidget* MainWindow::makePresetsPanel()
 {
-    auto* group  = new QGroupBox(tr("Firmware Presets"), this);
-    auto* layout = new QVBoxLayout(group);
+    m_groupPresets = new QGroupBox(tr("Firmware Presets"), this);
+    m_groupPresets->setMinimumWidth(0);
+    auto* group    = m_groupPresets;
+    auto* layout   = new QVBoxLayout(group);
 
     m_presetList = new QListWidget(group);
     m_presetList->setItemDelegate(new PresetDelegate(m_presetList));
@@ -177,6 +211,9 @@ QWidget* MainWindow::makePresetsPanel()
     m_btnAdd    = new QPushButton(tr("+  Add"),  group);
     m_btnEdit   = new QPushButton(tr("Edit"),    group);
     m_btnDelete = new QPushButton(tr("Delete"),  group);
+    m_btnAdd->setMinimumWidth(0);
+    m_btnEdit->setMinimumWidth(0);
+    m_btnDelete->setMinimumWidth(0);
     m_btnEdit->setEnabled(false);
     m_btnDelete->setEnabled(false);
     btnRow->addWidget(m_btnAdd);
@@ -197,8 +234,9 @@ QWidget* MainWindow::makePresetsPanel()
 
 QWidget* MainWindow::makeDevicesPanel()
 {
-    auto* group  = new QGroupBox(tr("Connected Devices"), this);
-    auto* layout = new QVBoxLayout(group);
+    m_groupDevices = new QGroupBox(tr("Connected Devices"), this);
+    auto* group    = m_groupDevices;
+    auto* layout   = new QVBoxLayout(group);
 
     auto* scroll     = new QScrollArea(group);
     auto* container  = new QWidget(scroll);
@@ -226,9 +264,9 @@ QWidget* MainWindow::makeBottomBar()
     auto* layout = new QHBoxLayout(bar);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    auto* btnSettings = new QPushButton(tr("Settings"), bar);
-    btnSettings->setFixedWidth(90);
-    layout->addWidget(btnSettings);
+    m_btnSettings = new QPushButton(tr("Settings"), bar);
+    m_btnSettings->setFixedWidth(90);
+    layout->addWidget(m_btnSettings);
 
     layout->addSpacing(12);
 
@@ -251,7 +289,7 @@ QWidget* MainWindow::makeBottomBar()
     m_btnFlashSel->setFixedWidth(180);
     layout->addWidget(m_btnFlashSel);
 
-    connect(btnSettings,   &QPushButton::clicked,  this, &MainWindow::openSettings);
+    connect(m_btnSettings, &QPushButton::clicked,  this, &MainWindow::openSettings);
     connect(m_autoFlash,   &QCheckBox::toggled,    this, &MainWindow::onAutoFlashToggled);
     connect(m_btnFlashSel, &QPushButton::clicked,  this, &MainWindow::flashSelected);
 
@@ -263,21 +301,12 @@ QWidget* MainWindow::makeBottomBar()
 void MainWindow::openSettings()
 {
     SettingsDialog dlg(this);
-    if (dlg.exec() != QDialog::Accepted) return;
-
-    QString newLang = dlg.language();
-    QSettings s("uuuapp", "UUUFlashTool");
-    QString oldLang = s.value("language", "en").toString();
-
-    s.setValue("language",    newLang);
-    s.setValue("sudoPrefix",  dlg.privilegePrefix());
-    s.setValue("uuuPath",     dlg.uuuPath());
-
-    applyUuuSettings(dlg.uuuPath(), dlg.privilegePrefix());
-
-    if (newLang != oldLang)
-        QMessageBox::information(this, tr("Language changed"),
-            tr("The language will change after restarting the application."));
+    connect(&dlg, &SettingsDialog::languageChanged, this, &MainWindow::applyLanguage);
+    connect(&dlg, &SettingsDialog::settingsSaved, this, [this]() {
+        QSettings s("uuuapp", "UUUFlashTool");
+        applyUuuSettings(s.value("uuuPath").toString(), s.value("sudoPrefix").toString());
+    });
+    dlg.exec();
 }
 
 void MainWindow::applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix)
@@ -520,13 +549,12 @@ void MainWindow::flashSelected()
     }
 
     bool any = false;
-    bool reboot = m_chkRebootAfter->isChecked();
     for (int i = 0; i < m_devicesLayout->count(); ++i) {
         auto* item = m_devicesLayout->itemAt(i);
         if (!item || !item->widget()) continue;
         auto* w = qobject_cast<DeviceItemWidget*>(item->widget());
         if (!w || !w->isChecked() || w->isFlashing()) continue;
-        w->flash(m_uuuPath, *p, m_sudoPrefix, reboot);
+        flashDevice(w);
         any = true;
     }
 

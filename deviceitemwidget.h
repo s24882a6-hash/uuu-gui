@@ -33,8 +33,12 @@ signals:
     void flashRequested();
     void flashDone(bool success);
 
+protected:
+    void changeEvent(QEvent* event) override;
+
 private slots:
     void onProgress(int pct);
+    void onPhaseChanged(int current, int total);
     void onLogLine(const QString& line);
     void onFlashFinished(bool success, const QString& err);
     void showLog();
@@ -44,6 +48,7 @@ private slots:
 
 private:
     void setFlashingState(bool active);
+    void retranslateUi();
 
     UsbDevice       m_device;
     FlashWorker*    m_worker    = nullptr;
@@ -54,11 +59,12 @@ private:
     QString        m_lastSudoPrefix;
     bool           m_lastRebootAfter = false;
 
-    QCheckBox*   m_check    = nullptr;
-    QLabel*      m_lblName  = nullptr;
-    QLabel*      m_lblStatus= nullptr;
-    QProgressBar* m_bar     = nullptr;
-    QLabel*      m_lblPct   = nullptr;
-    QPushButton* m_btnFlash = nullptr;
-    QPushButton* m_btnLog   = nullptr;
+    QCheckBox*   m_check     = nullptr;
+    QLabel*      m_lblName   = nullptr;
+    QLabel*      m_lblStatus = nullptr;
+    QLabel*      m_lblPhase  = nullptr;
+    QProgressBar* m_bar      = nullptr;
+    QLabel*      m_lblPct    = nullptr;
+    QPushButton* m_btnFlash  = nullptr;
+    QPushButton* m_btnLog    = nullptr;
 };

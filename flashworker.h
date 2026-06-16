@@ -5,6 +5,7 @@
 #include <QProcess>
 #include <QTimer>
 
+
 class FlashWorker : public QObject
 {
     Q_OBJECT
@@ -27,6 +28,7 @@ public:
 
 signals:
     void progressChanged(int percent);
+    void phaseChanged(int current, int total);
     void logLine(QString line);
     void finished(bool success, QString errorMsg);
     void permissionError();
@@ -38,8 +40,8 @@ private slots:
 
 private:
     QStringList buildPhaseCommand(int phaseIndex) const;
+    QString     scanForFastbootBusId() const;
     void parseLine(const QString& line);
-    void emitScaledProgress(int phasePct);
 
     QString            m_uuuPath;
     FirmwarePreset     m_preset;
@@ -53,8 +55,8 @@ private:
     bool               m_active            = false;
     bool               m_rebootAfterFlash  = false;
     bool               m_permissionError   = false;
-    bool               m_holdsSharedLock   = false;
     int                m_stepsDone         = 0;
     int                m_stepsTotal        = 0;
+    int                m_busIdScanRetries  = 0;
     bool               m_lastWasCmd        = false;
 };

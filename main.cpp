@@ -58,9 +58,10 @@ int main(int argc, char* argv[])
 
     QSettings appSettings("uuuapp", "UUUFlashTool");
     QString lang = appSettings.value("language", "").toString();
-    // Fall back to system locale on first launch
-    if (lang.isEmpty())
+    if (lang.isEmpty()) {
         lang = (QLocale::system().language() == QLocale::Russian) ? "ru" : "en";
+        appSettings.setValue("language", lang); // save so Settings dialog shows correct value
+    }
 
     QTranslator translator;
     if (lang == "ru" && translator.load(":/i18n/uuuapp_ru.qm"))

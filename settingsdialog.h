@@ -15,8 +15,13 @@ public:
     QString privilegePrefix() const;
     QString language()       const;   // "en" or "ru"
 
+signals:
+    void languageChanged(const QString& lang);
+    void settingsSaved();
+
 private slots:
     void browseUuu();
+    void save();
 
 private:
     void setupUi();

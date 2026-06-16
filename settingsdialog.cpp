@@ -1,7 +1,6 @@
 #include "settingsdialog.h"
 
 #include <QComboBox>
-#include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -62,13 +61,13 @@ void SettingsDialog::setupUi()
 
     root->addWidget(otherGroup);
 
-    // --- Buttons ---
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    root->addWidget(buttons);
-
     connect(m_uuuBrowse, &QPushButton::clicked, this, &SettingsDialog::browseUuu);
-    connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
+    connect(m_langCombo, &QComboBox::currentIndexChanged, this, [this]() {
+        emit languageChanged(m_langCombo->currentData().toString());
+        save();
+    });
+    connect(m_sudoCombo, &QComboBox::currentIndexChanged, this, [this]() { save(); });
+    connect(m_uuuCombo, &QComboBox::currentTextChanged, this, [this]() { save(); });
 }
 
 void SettingsDialog::loadFromSettings()
@@ -117,6 +116,15 @@ void SettingsDialog::browseUuu()
         idx = m_uuuCombo->count() - 1;
     }
     m_uuuCombo->setCurrentIndex(idx);
+}
+
+void SettingsDialog::save()
+{
+    QSettings s("uuuapp", "UUUFlashTool");
+    s.setValue("uuuPath",    m_uuuCombo->currentText().trimmed());
+    s.setValue("sudoPrefix", m_sudoCombo->currentData().toString());
+    s.setValue("language",   m_langCombo->currentData().toString());
+    emit settingsSaved();
 }
 
 QString SettingsDialog::uuuPath() const
