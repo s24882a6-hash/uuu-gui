@@ -44,6 +44,7 @@ private slots:
     // Flash
     void flashSelected();
     void flashDevice(DeviceItemWidget* widget);
+    void flashDevice(DeviceItemWidget* widget, const FirmwarePreset& preset);
 
     // Auto-flash
     void onAutoFlashToggled(bool enabled);

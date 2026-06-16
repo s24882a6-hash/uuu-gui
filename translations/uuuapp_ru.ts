@@ -176,6 +176,22 @@ Connect a device in recovery / SDP mode.</source>
         <source>All files (*)</source>
         <translation>Все файлы (*)</translation>
     </message>
+    <message>
+        <source>Flash Logs</source>
+        <translation>Логи прошивки</translation>
+    </message>
+    <message>
+        <source>Save logs to file</source>
+        <translation>Сохранять логи в файл</translation>
+    </message>
+    <message>
+        <source>Log directory…</source>
+        <translation>Папка для логов…</translation>
+    </message>
+    <message>
+        <source>Select log directory</source>
+        <translation>Выбрать папку для логов</translation>
+    </message>
 </context>
 
 <context>
@@ -335,6 +351,15 @@ Retry with pkexec (a password dialog will appear)?</source>
     <message>
         <source>Close</source>
         <translation>Закрыть</translation>
+    </message>
+</context>
+
+
+<context>
+    <name>FlashWorker</name>
+    <message>
+        <source>Warning: device not found in fastboot mode after re-enumeration</source>
+        <translation>Предупреждение: устройство не найдено в режиме fastboot после переподключения</translation>
     </message>
 </context>
 

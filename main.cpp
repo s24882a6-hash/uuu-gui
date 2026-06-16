@@ -56,16 +56,15 @@ int main(int argc, char* argv[])
     app.setApplicationVersion("1.0.0");
     app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
 
-    QSettings appSettings("uuuapp", "UUUFlashTool");
-    QString lang = appSettings.value("language", "").toString();
-    if (lang.isEmpty()) {
-        lang = (QLocale::system().language() == QLocale::Russian) ? "ru" : "en";
-        appSettings.setValue("language", lang); // save so Settings dialog shows correct value
+    // Set default language on first run (detect system locale)
+    {
+        QSettings appSettings("uuuapp", "UUUFlashTool");
+        if (appSettings.value("language").toString().isEmpty()) {
+            QString lang = (QLocale::system().language() == QLocale::Russian) ? "ru" : "en";
+            appSettings.setValue("language", lang);
+        }
     }
-
-    QTranslator translator;
-    if (lang == "ru" && translator.load(":/i18n/uuuapp_ru.qm"))
-        app.installTranslator(&translator);
+    // Translator is managed by MainWindow::applyLanguage via m_translator
 
 #ifdef Q_OS_WIN
     if (windowsDarkModeEnabled())

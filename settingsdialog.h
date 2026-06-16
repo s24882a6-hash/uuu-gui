@@ -1,6 +1,7 @@
 #pragma once
 #include <QDialog>
 
+class QCheckBox;
 class QComboBox;
 class QLineEdit;
 class QPushButton;
@@ -13,7 +14,9 @@ public:
 
     QString uuuPath()        const;
     QString privilegePrefix() const;
-    QString language()       const;   // "en" or "ru"
+    QString language()       const;
+    bool    saveLogsEnabled() const;
+    QString logDir()         const;
 
 signals:
     void languageChanged(const QString& lang);
@@ -21,6 +24,7 @@ signals:
 
 private slots:
     void browseUuu();
+    void browseLogDir();
     void save();
 
 private:
@@ -29,8 +33,11 @@ private:
 
     static QStringList findUuuBinaries();
 
-    QComboBox*   m_uuuCombo  = nullptr;
-    QPushButton* m_uuuBrowse = nullptr;
-    QComboBox*   m_sudoCombo = nullptr;
-    QComboBox*   m_langCombo = nullptr;
+    QComboBox*   m_uuuCombo    = nullptr;
+    QPushButton* m_uuuBrowse   = nullptr;
+    QComboBox*   m_sudoCombo   = nullptr;
+    QComboBox*   m_langCombo   = nullptr;
+    QCheckBox*   m_chkSaveLogs = nullptr;
+    QLineEdit*   m_logDirEdit  = nullptr;
+    QPushButton* m_logDirBrowse = nullptr;
 };

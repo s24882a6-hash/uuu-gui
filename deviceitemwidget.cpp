@@ -1,6 +1,8 @@
 #include "deviceitemwidget.h"
 #include "flashworker.h"
 #include "logdialog.h"
+#include <QDateTime>
+#include <QDir>
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QCheckBox>
@@ -9,6 +11,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QFrame>
+#include <QSettings>
 
 DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     : QWidget(parent)
@@ -124,6 +127,30 @@ void DeviceItemWidget::flash(const QString& uuuPath,
     else
         m_logDialog->setStatus(tr("Flashing…"));
 
+    // Open log file if enabled in settings
+    if (m_logFile.isOpen()) {
+        m_logStream.flush();
+        m_logFile.close();
+    }
+    QSettings s("uuuapp", "UUUFlashTool");
+    if (s.value("saveLogs", false).toBool()) {
+        QString dir = s.value("logDir").toString();
+        if (!dir.isEmpty() && QDir().mkpath(dir)) {
+            QString deviceId = m_device.serialNumber.isEmpty()
+                ? m_device.busId.replace(':', '-')
+                : m_device.serialNumber;
+            QString ts   = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+            QString name = QString("flash_%1_%2.log").arg(deviceId, ts);
+            m_logFile.setFileName(QDir(dir).filePath(name));
+            if (m_logFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                m_logStream.setDevice(&m_logFile);
+                m_logStream << "=== Flash log: " << m_device.displayName()
+                            << "  " << QDateTime::currentDateTime().toString(Qt::ISODate)
+                            << " ===\n";
+            }
+        }
+    }
+
     setFlashingState(true);
     m_worker->start();
 }
@@ -194,10 +221,18 @@ void DeviceItemWidget::onLogLine(const QString& line)
 {
     if (m_logDialog)
         m_logDialog->appendLine(line);
+    if (m_logFile.isOpen())
+        m_logStream << line << '\n';
 }
 
 void DeviceItemWidget::onFlashFinished(bool success, const QString& err)
 {
+    if (m_logFile.isOpen()) {
+        m_logStream << (success ? "\n=== DONE ===" : QString("\n=== FAILED: %1 ===").arg(err)) << '\n';
+        m_logStream.flush();
+        m_logFile.close();
+    }
+
     setFlashingState(false);
     emit flashDone(success);
 

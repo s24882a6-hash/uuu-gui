@@ -477,7 +477,7 @@ void MainWindow::onDeviceConnected(UsbDevice dev)
         for (auto& p : m_presets) {
             if (p.id == autoId) {
                 auto* w = m_deviceWidgets.value(dev.busId);
-                if (w) w->flash(m_uuuPath, p, m_sudoPrefix, m_chkRebootAfter->isChecked());
+                if (w) flashDevice(w, p);
                 break;
             }
         }
@@ -489,7 +489,10 @@ void MainWindow::onDeviceDisconnected(QString busId)
     auto* w = m_deviceWidgets.value(busId);
     if (!w) return;
 
-    if (w->isFlashing()) {
+    // Keep widget while any flash is active — device may be re-enumerating.
+    // isFlashing() alone is not enough: the worker finishes slightly before
+    // the USB disconnect event arrives on the main thread.
+    if (w->isFlashing() || m_activeFlashCount > 0) {
         m_statusBar->setText(tr("Device rebooting: %1").arg(w->device().displayName()));
         return;
     }
@@ -517,13 +520,17 @@ void MainWindow::flashDevice(DeviceItemWidget* widget)
 {
     FirmwarePreset* p = selectedPreset();
     if (!p) return;
+    flashDevice(widget, *p);
+}
 
+void MainWindow::flashDevice(DeviceItemWidget* widget, const FirmwarePreset& preset)
+{
     if (m_uuuPath.isEmpty() || !QFileInfo::exists(m_uuuPath)) {
         QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
         return;
     }
 
-    if (!p->isValid()) {
+    if (!preset.isValid()) {
         QMessageBox::warning(this, tr("Invalid preset"),
             tr("The selected preset has missing or invalid files."));
         return;
@@ -531,7 +538,7 @@ void MainWindow::flashDevice(DeviceItemWidget* widget)
 
     ++m_activeFlashCount;
     m_monitor->setOpenAllowed(false);
-    widget->flash(m_uuuPath, *p, m_sudoPrefix, m_chkRebootAfter->isChecked());
+    widget->flash(m_uuuPath, preset, m_sudoPrefix, m_chkRebootAfter->isChecked());
 }
 
 void MainWindow::flashSelected()

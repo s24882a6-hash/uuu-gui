@@ -2,6 +2,8 @@
 #include "devicemonitor.h"
 #include "firmwarepreset.h"
 #include <QWidget>
+#include <QFile>
+#include <QTextStream>
 
 class QCheckBox;
 class QLabel;
@@ -53,6 +55,9 @@ private:
     UsbDevice       m_device;
     FlashWorker*    m_worker    = nullptr;
     LogDialog*      m_logDialog = nullptr;
+
+    QFile           m_logFile;
+    QTextStream     m_logStream;
 
     QString        m_lastUuuPath;
     FirmwarePreset m_lastPreset;

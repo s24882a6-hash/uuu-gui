@@ -1,11 +1,13 @@
 #include "settingsdialog.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
@@ -61,7 +63,36 @@ void SettingsDialog::setupUi()
 
     root->addWidget(otherGroup);
 
-    connect(m_uuuBrowse, &QPushButton::clicked, this, &SettingsDialog::browseUuu);
+    // --- Flash Logs ---
+    auto* logsGroup  = new QGroupBox(tr("Flash Logs"), this);
+    auto* logsLayout = new QVBoxLayout(logsGroup);
+
+    m_chkSaveLogs = new QCheckBox(tr("Save logs to file"), logsGroup);
+    logsLayout->addWidget(m_chkSaveLogs);
+
+    auto* dirRow   = new QHBoxLayout;
+    m_logDirEdit   = new QLineEdit(logsGroup);
+    m_logDirEdit->setPlaceholderText(tr("Log directory…"));
+    m_logDirBrowse = new QPushButton(tr("Browse…"), logsGroup);
+    m_logDirBrowse->setFixedWidth(80);
+    dirRow->addWidget(m_logDirEdit, 1);
+    dirRow->addWidget(m_logDirBrowse);
+    logsLayout->addLayout(dirRow);
+    root->addWidget(logsGroup);
+
+    auto updateLogDirState = [this]() {
+        m_logDirEdit->setEnabled(m_chkSaveLogs->isChecked());
+        m_logDirBrowse->setEnabled(m_chkSaveLogs->isChecked());
+    };
+    updateLogDirState();
+
+    connect(m_uuuBrowse,    &QPushButton::clicked, this, &SettingsDialog::browseUuu);
+    connect(m_logDirBrowse, &QPushButton::clicked, this, &SettingsDialog::browseLogDir);
+    connect(m_chkSaveLogs,  &QCheckBox::toggled,   this, [this, updateLogDirState]() {
+        updateLogDirState();
+        save();
+    });
+    connect(m_logDirEdit,   &QLineEdit::textChanged, this, [this]() { save(); });
     connect(m_langCombo, &QComboBox::currentIndexChanged, this, [this]() {
         emit languageChanged(m_langCombo->currentData().toString());
         save();
@@ -72,6 +103,15 @@ void SettingsDialog::setupUi()
 
 void SettingsDialog::loadFromSettings()
 {
+    // Block all auto-save signals while restoring values.
+    // Without this, setting one widget triggers save() before the others are
+    // populated, which can overwrite QSettings with incomplete data.
+    QSignalBlocker b1(m_uuuCombo);
+    QSignalBlocker b2(m_sudoCombo);
+    QSignalBlocker b3(m_langCombo);
+    QSignalBlocker b4(m_chkSaveLogs);
+    QSignalBlocker b5(m_logDirEdit);
+
     // Populate uuu combo with found binaries
     QStringList found = findUuuBinaries();
     for (const QString& p : found)
@@ -94,10 +134,17 @@ void SettingsDialog::loadFromSettings()
     int pidx = m_sudoCombo->findData(savedPrefix);
     if (pidx >= 0) m_sudoCombo->setCurrentIndex(pidx);
 
-    // Restore language
+    // Restore language (apply silently — already active in the app)
     QString savedLang = s.value("language", "en").toString();
     int lidx = m_langCombo->findData(savedLang);
     if (lidx >= 0) m_langCombo->setCurrentIndex(lidx);
+
+    // Restore log settings
+    m_chkSaveLogs->setChecked(s.value("saveLogs", false).toBool());
+    m_logDirEdit->setText(s.value("logDir",
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).toString());
+    m_logDirEdit->setEnabled(m_chkSaveLogs->isChecked());
+    m_logDirBrowse->setEnabled(m_chkSaveLogs->isChecked());
 }
 
 void SettingsDialog::browseUuu()
@@ -118,29 +165,30 @@ void SettingsDialog::browseUuu()
     m_uuuCombo->setCurrentIndex(idx);
 }
 
+void SettingsDialog::browseLogDir()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Select log directory"),
+                                                    m_logDirEdit->text());
+    if (!dir.isEmpty())
+        m_logDirEdit->setText(dir);
+}
+
 void SettingsDialog::save()
 {
     QSettings s("uuuapp", "UUUFlashTool");
     s.setValue("uuuPath",    m_uuuCombo->currentText().trimmed());
     s.setValue("sudoPrefix", m_sudoCombo->currentData().toString());
     s.setValue("language",   m_langCombo->currentData().toString());
+    s.setValue("saveLogs",   m_chkSaveLogs->isChecked());
+    s.setValue("logDir",     m_logDirEdit->text().trimmed());
     emit settingsSaved();
 }
 
-QString SettingsDialog::uuuPath() const
-{
-    return m_uuuCombo->currentText().trimmed();
-}
-
-QString SettingsDialog::privilegePrefix() const
-{
-    return m_sudoCombo->currentData().toString();
-}
-
-QString SettingsDialog::language() const
-{
-    return m_langCombo->currentData().toString();
-}
+QString SettingsDialog::uuuPath() const        { return m_uuuCombo->currentText().trimmed(); }
+QString SettingsDialog::privilegePrefix() const { return m_sudoCombo->currentData().toString(); }
+QString SettingsDialog::language() const        { return m_langCombo->currentData().toString(); }
+bool    SettingsDialog::saveLogsEnabled() const { return m_chkSaveLogs->isChecked(); }
+QString SettingsDialog::logDir() const          { return m_logDirEdit->text().trimmed(); }
 
 QStringList SettingsDialog::findUuuBinaries()
 {
