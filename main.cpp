@@ -4,11 +4,7 @@
 #include <QLocale>
 #include <QPalette>
 #include <QStyleFactory>
-#include <QTranslator>
 #include <QSettings>
-#ifdef Q_OS_WIN
-// QSettings already included above
-#endif
 
 #ifdef Q_OS_WIN
 static bool windowsDarkModeEnabled()

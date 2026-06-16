@@ -584,6 +584,8 @@ void MainWindow::loadSettings()
     m_uuuPath    = s.value("uuuPath").toString();
     m_sudoPrefix = s.value("sudoPrefix").toString();
 
+    applyLanguage(s.value("language", "en").toString());
+
     m_autoFlash->setChecked(s.value("autoFlash", false).toBool());
     m_chkRebootAfter->setChecked(s.value("rebootAfterFlash", false).toBool());
 
