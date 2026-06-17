@@ -144,6 +144,7 @@ void DeviceItemWidget::flash(const QString& uuuPath,
             m_logFile.setFileName(QDir(dir).filePath(name));
             if (m_logFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
                 m_logStream.setDevice(&m_logFile);
+                m_logStream.setEncoding(QStringConverter::Utf8);
                 m_logStream << "=== Flash log: " << m_device.displayName()
                             << "  " << QDateTime::currentDateTime().toString(Qt::ISODate)
                             << " ===\n";
