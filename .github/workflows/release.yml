@@ -41,7 +41,7 @@ jobs:
             --desktop-file uuuapp.desktop \
             --icon-file uuuapp.png \
             --output appimage
-          mv *.AppImage uuu-gui-linux.AppImage
+          mv UUU_Flash_Tool-x86_64.AppImage uuu-gui-linux.AppImage
 
       - name: Build .deb
         run: |
