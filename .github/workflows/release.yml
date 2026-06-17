@@ -1,10 +1,9 @@
-name: Build
+name: Release
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - 'v*'
 
 jobs:
   build-linux:
@@ -20,7 +19,7 @@ jobs:
           sudo apt-get install -y qt6-base-dev libqt6svg6-dev libusb-1.0-0-dev cmake build-essential \
             libgl-dev libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 \
-            qt6-gtk-platformtheme
+            qt6-gtk-platformtheme librsvg2-bin
 
       - name: Build
         run: |
@@ -30,9 +29,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          sudo apt-get install -y librsvg2-bin
           rsvg-convert -w 256 -h 256 icons/uuuapp.svg -o uuuapp.png
-
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
@@ -44,40 +41,35 @@ jobs:
             --desktop-file uuuapp.desktop \
             --icon-file uuuapp.png \
             --output appimage
+          mv *.AppImage uuu-gui-linux.AppImage
 
-      - name: Package deb
+      - name: Build .deb
         run: |
-          sudo apt-get install -y alien
+          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
           cp AppDir/usr/bin/uuuapp deb/usr/bin/
           cp uuuapp.desktop        deb/usr/share/applications/
           cp uuuapp.png            deb/usr/share/icons/hicolor/256x256/apps/uuuapp.png
-          cat > deb/DEBIAN/control << 'EOF'
+          cat > deb/DEBIAN/control << EOF
           Package: uuu-gui
-          Version: 1.0.0
+          Version: ${VERSION}
           Architecture: amd64
           Maintainer: uuu-gui
           Depends: libqt6widgets6, libusb-1.0-0
           Description: NXP UUU firmware flashing GUI
           EOF
-          dpkg-deb --build deb uuu-gui-amd64.deb
-          sudo alien --to-rpm --scripts uuu-gui-amd64.deb
+          dpkg-deb --build deb uuu-gui-linux.deb
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uuu-gui-linux-appimage
-          path: "*.AppImage"
+          name: linux-appimage
+          path: uuu-gui-linux.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uuu-gui-linux-deb
-          path: "uuu-gui-amd64.deb"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: uuu-gui-linux-rpm
-          path: "*.rpm"
+          name: linux-deb
+          path: uuu-gui-linux.deb
 
   build-macos:
     runs-on: macos-latest
@@ -92,7 +84,7 @@ jobs:
           version: '6.8.0'
           arch: clang_64
 
-      - name: Install libusb
+      - name: Install dependencies
         run: brew install libusb librsvg
 
       - name: Generate macOS icon
@@ -109,7 +101,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix libusb)"
           cmake --build build
 
-      - name: Deploy
+      - name: Package DMG
         run: |
           macdeployqt build/uuuapp.app
           codesign --force --deep --sign - build/uuuapp.app
@@ -117,7 +109,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uuu-gui-macos
+          name: macos-dmg
           path: uuu-gui-macos.dmg
 
   build-windows:
@@ -142,9 +134,32 @@ jobs:
           cmake --build build --config Release
 
       - name: Deploy
-        run: windeployqt build/Release/uuuapp.exe
+        run: |
+          windeployqt build/Release/uuuapp.exe
+          Compress-Archive -Path build/Release/* -DestinationPath uuu-gui-windows.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uuu-gui-windows
-          path: build/Release/
+          name: windows-zip
+          path: uuu-gui-windows.zip
+
+  release:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/linux-appimage/uuu-gui-linux.AppImage
+            artifacts/linux-deb/uuu-gui-linux.deb
+            artifacts/macos-dmg/uuu-gui-macos.dmg
+            artifacts/windows-zip/uuu-gui-windows.zip
