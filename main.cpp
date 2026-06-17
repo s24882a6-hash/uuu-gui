@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("UUU Flash Tool");
     app.setOrganizationName("uuuapp");
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion(APP_VERSION);
     app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
 
     // Set default language on first run (detect system locale)

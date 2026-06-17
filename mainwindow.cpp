@@ -107,7 +107,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_monitor(new DeviceMonitor(this))
 {
-    setWindowTitle(tr("UUU Flash Tool"));
+    setWindowTitle(tr("UUU Flash Tool") + " v" + QCoreApplication::applicationVersion());
     setMinimumSize(900, 600);
 
     setupUi();
@@ -151,7 +151,7 @@ void MainWindow::changeEvent(QEvent* event)
 
 void MainWindow::retranslateUi()
 {
-    setWindowTitle(tr("UUU Flash Tool"));
+    setWindowTitle(tr("UUU Flash Tool") + " v" + QCoreApplication::applicationVersion());
     if (m_groupPresets) m_groupPresets->setTitle(tr("Firmware Presets"));
     if (m_groupDevices) m_groupDevices->setTitle(tr("Connected Devices"));
     m_btnAdd->setText(tr("+  Add"));

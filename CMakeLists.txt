@@ -78,6 +78,24 @@ endif()
 qt6_add_resources(uuuapp "resources" PREFIX "/" FILES icons/uuuapp.svg)
 target_sources(uuuapp PRIVATE translations/translations.qrc)
 
+# --- Version from git tag ---
+find_package(Git QUIET)
+if(Git_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    string(REGEX REPLACE "^v" "" GIT_VERSION "${GIT_VERSION}")
+endif()
+if(NOT GIT_VERSION OR GIT_VERSION STREQUAL "")
+    set(GIT_VERSION "${PROJECT_VERSION}")
+endif()
+message(STATUS "App version: ${GIT_VERSION}")
+target_compile_definitions(uuuapp PRIVATE APP_VERSION="${GIT_VERSION}")
+
 target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 
 if(LIBUSB_FOUND)
