@@ -1,6 +1,6 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
 <qresource prefix="/i18n">
-    <file alias="uuuapp_ru.qm">uuuapp_ru.qm</file>
+    <file alias="UUUFlashTool_ru.qm">UUUFlashTool_ru.qm</file>
 </qresource>
 </RCC>

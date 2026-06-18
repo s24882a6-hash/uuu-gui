@@ -165,7 +165,7 @@ void MainWindow::retranslateUi()
 void MainWindow::applyLanguage(const QString& lang)
 {
     qApp->removeTranslator(&m_translator);
-    if (lang == "ru" && m_translator.load(":/i18n/uuuapp_ru.qm"))
+    if (lang == "ru" && m_translator.load(":/i18n/UUUFlashTool_ru.qm"))
         qApp->installTranslator(&m_translator);
     // Qt sends LanguageChange to all widgets automatically
 }

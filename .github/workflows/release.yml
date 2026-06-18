@@ -30,7 +30,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          rsvg-convert -w 256 -h 256 icons/uuuapp.svg -o uuuapp.png
+          rsvg-convert -w 256 -h 256 icons/UUUFlashTool.svg -o UUUFlashTool.png
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
@@ -40,8 +40,8 @@ jobs:
             --appdir AppDir \
             --plugin qt \
             --executable AppDir/usr/bin/uuu-helper \
-            --desktop-file uuuapp.desktop \
-            --icon-file uuuapp.png \
+            --desktop-file UUUFlashTool.desktop \
+            --icon-file UUUFlashTool.png \
             --output appimage
           mv UUU_Flash_Tool-x86_64.AppImage uuu-gui-linux.AppImage
 
@@ -50,10 +50,10 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
-          cp AppDir/usr/bin/uuuapp     deb/usr/bin/
-          cp AppDir/usr/bin/uuu-helper deb/usr/bin/
-          cp uuuapp.desktop        deb/usr/share/applications/
-          cp uuuapp.png            deb/usr/share/icons/hicolor/256x256/apps/uuuapp.png
+          cp AppDir/usr/bin/UUUFlashTool deb/usr/bin/
+          cp AppDir/usr/bin/uuu-helper    deb/usr/bin/
+          cp UUUFlashTool.desktop deb/usr/share/applications/
+          cp UUUFlashTool.png     deb/usr/share/icons/hicolor/256x256/apps/UUUFlashTool.png
           cat > deb/DEBIAN/control << EOF
           Package: uuu-gui
           Version: ${VERSION}
@@ -94,14 +94,14 @@ jobs:
         run: |
           # Use the safe-area variant (squircle + transparent margins) so the
           # Dock icon matches the macOS style.
-          mkdir -p uuuapp.iconset
-          gen() { rsvg-convert -w "$1" -h "$1" icons/uuuapp_macos.svg -o "uuuapp.iconset/$2"; }
+          mkdir -p UUUFlashTool.iconset
+          gen() { rsvg-convert -w "$1" -h "$1" icons/UUUFlashTool-macos.svg -o "UUUFlashTool.iconset/$2"; }
           gen 16  icon_16x16.png;    gen 32   icon_16x16@2x.png
           gen 32  icon_32x32.png;    gen 64   icon_32x32@2x.png
           gen 128 icon_128x128.png;  gen 256  icon_128x128@2x.png
           gen 256 icon_256x256.png;  gen 512  icon_256x256@2x.png
           gen 512 icon_512x512.png;  gen 1024 icon_512x512@2x.png
-          iconutil -c icns uuuapp.iconset -o icons/uuuapp.icns
+          iconutil -c icns UUUFlashTool.iconset -o icons/UUUFlashTool.icns
 
       - name: Build
         run: |
@@ -111,9 +111,9 @@ jobs:
       - name: Package DMG
         run: |
           # -executable= makes macdeployqt also bundle/fix-up the uuu-helper's dylibs
-          macdeployqt build/uuuapp.app -executable=build/uuuapp.app/Contents/MacOS/uuu-helper
-          codesign --force --deep --sign - build/uuuapp.app
-          hdiutil create -volname uuu-gui -srcfolder build/uuuapp.app -ov -format UDZO uuu-gui-macos.dmg
+          macdeployqt build/UUUFlashTool.app -executable=build/UUUFlashTool.app/Contents/MacOS/uuu-helper
+          codesign --force --deep --sign - build/UUUFlashTool.app
+          hdiutil create -volname uuu-gui -srcfolder build/UUUFlashTool.app -ov -format UDZO uuu-gui-macos.dmg
 
       - uses: actions/upload-artifact@v4
         with:
@@ -148,7 +148,7 @@ jobs:
 
       - name: Deploy
         run: |
-          windeployqt build/Release/uuuapp.exe
+          windeployqt build/Release/UUUFlashTool.exe
           Compress-Archive -Path build/Release/* -DestinationPath uuu-gui-windows.zip
 
       - uses: actions/upload-artifact@v4

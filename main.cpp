@@ -11,13 +11,13 @@ int main(int argc, char* argv[])
     // constructor used throughout the app. Keep "UUUFlashTool" to preserve the
     // existing settings location. The user-facing title is a separate tr() string.
     app.setApplicationName("UUUFlashTool");
-    app.setOrganizationName("uuuapp");
+    app.setOrganizationName("UUUFlashTool");
     app.setApplicationVersion(APP_VERSION);
 #ifndef Q_OS_MAC
     // On macOS the Dock uses the bundle's .icns (rounded, safe-area); setting a
     // window icon here would override it with the full-bleed square. Other
     // platforms need it for the title bar / taskbar.
-    app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
+    app.setWindowIcon(QIcon(":/icons/UUUFlashTool.svg"));
 #endif
 
     // Set default language on first run (detect system locale)

@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file>icons/uuuapp.svg</file>
+        <file>icons/UUUFlashTool.svg</file>
     </qresource>
 </RCC>

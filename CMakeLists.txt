@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(uuuapp VERSION 1.0.0 LANGUAGES CXX)
+project(UUUFlashTool VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -98,24 +98,24 @@ set(HEADERS
 )
 
 if(WIN32)
-    set(APP_ICON_WIN "${CMAKE_CURRENT_SOURCE_DIR}/icons/uuuapp.rc")
-    qt6_add_executable(uuuapp WIN32 ${SOURCES} ${HEADERS} ${APP_ICON_WIN})
+    set(APP_ICON_WIN "${CMAKE_CURRENT_SOURCE_DIR}/icons/UUUFlashTool.rc")
+    qt6_add_executable(UUUFlashTool WIN32 ${SOURCES} ${HEADERS} ${APP_ICON_WIN})
 elseif(APPLE)
     set(MACOSX_BUNDLE_BUNDLE_NAME "UUU Flash Tool")
-    set(APP_ICON_MACOS "${CMAKE_CURRENT_SOURCE_DIR}/icons/uuuapp.icns")
+    set(APP_ICON_MACOS "${CMAKE_CURRENT_SOURCE_DIR}/icons/UUUFlashTool.icns")
     if(EXISTS "${APP_ICON_MACOS}")
-        set(MACOSX_BUNDLE_ICON_FILE uuuapp.icns)
+        set(MACOSX_BUNDLE_ICON_FILE UUUFlashTool.icns)
         set_source_files_properties(${APP_ICON_MACOS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-        qt6_add_executable(uuuapp MACOSX_BUNDLE ${SOURCES} ${HEADERS} ${APP_ICON_MACOS})
+        qt6_add_executable(UUUFlashTool MACOSX_BUNDLE ${SOURCES} ${HEADERS} ${APP_ICON_MACOS})
     else()
-        qt6_add_executable(uuuapp MACOSX_BUNDLE ${SOURCES} ${HEADERS})
+        qt6_add_executable(UUUFlashTool MACOSX_BUNDLE ${SOURCES} ${HEADERS})
     endif()
 else()
-    qt6_add_executable(uuuapp ${SOURCES} ${HEADERS})
+    qt6_add_executable(UUUFlashTool ${SOURCES} ${HEADERS})
 endif()
 
-qt6_add_resources(uuuapp "resources" PREFIX "/" FILES icons/uuuapp.svg)
-target_sources(uuuapp PRIVATE translations/translations.qrc)
+qt6_add_resources(UUUFlashTool "resources" PREFIX "/" FILES icons/UUUFlashTool.svg)
+target_sources(UUUFlashTool PRIVATE translations/translations.qrc)
 
 # --- Version from git tag ---
 find_package(Git QUIET)
@@ -133,23 +133,23 @@ if(NOT GIT_VERSION OR GIT_VERSION STREQUAL "")
     set(GIT_VERSION "${PROJECT_VERSION}")
 endif()
 message(STATUS "App version: ${GIT_VERSION}")
-target_compile_definitions(uuuapp PRIVATE APP_VERSION="${GIT_VERSION}")
+target_compile_definitions(UUUFlashTool PRIVATE APP_VERSION="${GIT_VERSION}")
 
-target_link_libraries(uuuapp PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
+target_link_libraries(UUUFlashTool PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 
 if(LIBUSB_FOUND)
-    target_link_libraries(uuuapp PRIVATE PkgConfig::LIBUSB)
-    target_compile_definitions(uuuapp PRIVATE HAVE_LIBUSB)
+    target_link_libraries(UUUFlashTool PRIVATE PkgConfig::LIBUSB)
+    target_compile_definitions(UUUFlashTool PRIVATE HAVE_LIBUSB)
 endif()
 
 if(WIN32)
-    target_link_libraries(uuuapp PRIVATE setupapi)
+    target_link_libraries(UUUFlashTool PRIVATE setupapi)
 endif()
 
 if(APPLE)
     find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
     find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
-    target_link_libraries(uuuapp PRIVATE ${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
+    target_link_libraries(UUUFlashTool PRIVATE ${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
 endif()
 
 # --- uuu-helper (libuuu-backed flash/list worker, spawned by the GUI) ---
@@ -183,17 +183,16 @@ if(APPLE)
 endif()
 
 # Place the helper next to the app executable so applicationDirPath() finds it
-# (on macOS this is uuuapp.app/Contents/MacOS). Done via an always-run target
-# rather than a POST_BUILD on uuuapp, so the copy refreshes even when only the
-# helper was rebuilt and uuuapp itself did not relink.
+# (on macOS this is UUUFlashTool.app/Contents/MacOS). Done via an always-run
+# target so the copy refreshes even when only the helper was rebuilt.
 add_custom_target(bundle-helper ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:uuu-helper> $<TARGET_FILE_DIR:uuuapp>
-    COMMENT "Bundling uuu-helper next to uuuapp")
-add_dependencies(bundle-helper uuu-helper uuuapp)
+            $<TARGET_FILE:uuu-helper> $<TARGET_FILE_DIR:UUUFlashTool>
+    COMMENT "Bundling uuu-helper next to UUUFlashTool")
+add_dependencies(bundle-helper uuu-helper UUUFlashTool)
 
 # Install
-install(TARGETS uuuapp
+install(TARGETS UUUFlashTool
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
 )
