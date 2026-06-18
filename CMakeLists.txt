@@ -65,6 +65,9 @@ FetchContent_Declare(mfgtools
     GIT_SUBMODULES    ""        # we link system libraries, not bundled submodules
     GIT_SHALLOW       TRUE
     SOURCE_SUBDIR     libuuu
+    # libuuu generates gitversion.h with POSIX shell commands that fail on
+    # Windows; patch it to a portable cmake -E copy of a static header.
+    PATCH_COMMAND     ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_libuuu.cmake
 )
 FetchContent_MakeAvailable(mfgtools)
 
