@@ -17,7 +17,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libqt6svg6-dev libusb-1.0-0-dev cmake build-essential \
+          sudo apt-get install -y qt6-base-dev libqt6svg6-dev libusb-1.0-0-dev cmake build-essential git \
+            libzstd-dev libtinyxml2-dev libbz2-dev zlib1g-dev libssl-dev \
             libgl-dev libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 \
             qt6-gtk-platformtheme
@@ -41,6 +42,7 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
+            --executable AppDir/usr/bin/uuu-helper \
             --desktop-file uuuapp.desktop \
             --icon-file uuuapp.png \
             --output appimage
@@ -50,7 +52,8 @@ jobs:
           sudo apt-get install -y alien
           mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
-          cp AppDir/usr/bin/uuuapp deb/usr/bin/
+          cp AppDir/usr/bin/uuuapp     deb/usr/bin/
+          cp AppDir/usr/bin/uuu-helper deb/usr/bin/
           cp uuuapp.desktop        deb/usr/share/applications/
           cp uuuapp.png            deb/usr/share/icons/hicolor/256x256/apps/uuuapp.png
           cat > deb/DEBIAN/control << 'EOF'
@@ -58,7 +61,7 @@ jobs:
           Version: 1.0.0
           Architecture: amd64
           Maintainer: uuu-gui
-          Depends: libqt6widgets6, libusb-1.0-0
+          Depends: libqt6widgets6, libqt6svg6, libusb-1.0-0, libzstd1, libtinyxml2-9, libbz2-1.0, zlib1g, libssl3
           Description: NXP UUU firmware flashing GUI
           EOF
           dpkg-deb --build deb uuu-gui-amd64.deb
@@ -92,8 +95,8 @@ jobs:
           version: '6.8.0'
           arch: clang_64
 
-      - name: Install libusb
-        run: brew install libusb librsvg
+      - name: Install dependencies
+        run: brew install libusb zstd tinyxml2 bzip2 openssl@3 pkg-config librsvg
 
       - name: Generate macOS icon
         run: |
@@ -111,7 +114,8 @@ jobs:
 
       - name: Deploy
         run: |
-          macdeployqt build/uuuapp.app
+          # -executable= makes macdeployqt also bundle/fix-up the uuu-helper's dylibs
+          macdeployqt build/uuuapp.app -executable=build/uuuapp.app/Contents/MacOS/uuu-helper
           codesign --force --deep --sign - build/uuuapp.app
           hdiutil create -volname uuu-gui -srcfolder build/uuuapp.app -ov -format UDZO uuu-gui-macos.dmg
 
@@ -133,12 +137,17 @@ jobs:
           version: '6.8.0'
           arch: win64_msvc2022_64
 
-      - name: Install libusb
-        run: vcpkg install libusb --triplet x64-windows
+      - name: Install dependencies
+        run: vcpkg install libusb zstd tinyxml2 bzip2 zlib openssl pkgconf --triplet x64-windows
 
       - name: Build
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          # libuuu's CMake uses pkg_check_modules, so point pkg-config at vcpkg's .pc files
+          $env:PKG_CONFIG_PATH = "C:/vcpkg/installed/x64-windows/lib/pkgconfig"
+          $env:PATH = "C:/vcpkg/installed/x64-windows/tools/pkgconf;$env:PATH"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
           cmake --build build --config Release
 
       - name: Deploy

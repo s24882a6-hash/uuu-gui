@@ -7,6 +7,27 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# On macOS several libuuu dependencies (zstd, tinyxml2, openssl) are Homebrew
+# keg-only, so their .pc files aren't on the default pkg-config search path.
+# Add them automatically so a plain `cmake -B build` works without exporting
+# PKG_CONFIG_PATH by hand. Must run before FetchContent pulls in libuuu.
+if(APPLE)
+    find_program(BREW_EXECUTABLE brew)
+    if(BREW_EXECUTABLE)
+        foreach(_pkg zstd tinyxml2 libusb openssl@3)
+            execute_process(COMMAND ${BREW_EXECUTABLE} --prefix ${_pkg}
+                OUTPUT_VARIABLE _prefix OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+            if(_prefix AND EXISTS "${_prefix}/lib/pkgconfig")
+                set(ENV{PKG_CONFIG_PATH} "${_prefix}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+            endif()
+        endforeach()
+        if(NOT OPENSSL_ROOT_DIR)
+            execute_process(COMMAND ${BREW_EXECUTABLE} --prefix openssl@3
+                OUTPUT_VARIABLE OPENSSL_ROOT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        endif()
+    endif()
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Svg)
 
 # --- libusb ---
@@ -34,6 +55,19 @@ if(NOT LIBUSB_FOUND)
                     "  Windows: install via vcpkg: vcpkg install libusb")
 endif()
 
+# --- libuuu (built from source, drives the uuu-helper worker) ---
+# Vendored via FetchContent; SOURCE_SUBDIR builds only the static `uuc_s`
+# library target, not the upstream CLI.
+include(FetchContent)
+FetchContent_Declare(mfgtools
+    GIT_REPOSITORY    https://github.com/nxp-imx/mfgtools.git
+    GIT_TAG           uuu_1.5.243
+    GIT_SUBMODULES    ""        # we link system libraries, not bundled submodules
+    GIT_SHALLOW       TRUE
+    SOURCE_SUBDIR     libuuu
+)
+FetchContent_MakeAvailable(mfgtools)
+
 # --- Sources ---
 set(SOURCES
     main.cpp
@@ -45,6 +79,7 @@ set(SOURCES
     flashworker.cpp
     deviceitemwidget.cpp
     logdialog.cpp
+    apppaths.cpp
 )
 
 set(HEADERS
@@ -56,6 +91,7 @@ set(HEADERS
     flashworker.h
     deviceitemwidget.h
     logdialog.h
+    apppaths.h
 )
 
 if(WIN32)
@@ -113,8 +149,49 @@ if(APPLE)
     target_link_libraries(uuuapp PRIVATE ${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
 endif()
 
+# --- uuu-helper (libuuu-backed flash/list worker, spawned by the GUI) ---
+# uuc_s exposes no usage requirements, so we resupply libuuu's include dir and
+# its transitive link dependencies here.
+find_package(BZip2 REQUIRED)
+find_package(ZLIB  REQUIRED)
+find_package(OpenSSL)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(LIBZSTD  REQUIRED IMPORTED_TARGET libzstd)
+    pkg_check_modules(TINYXML2 REQUIRED IMPORTED_TARGET tinyxml2)
+    pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
+endif()
+
+add_executable(uuu-helper helper/uuuhelper.cpp)
+target_include_directories(uuu-helper PRIVATE "${mfgtools_SOURCE_DIR}/libuuu")
+target_link_libraries(uuu-helper PRIVATE
+    uuc_s
+    PkgConfig::HELPER_LIBUSB
+    PkgConfig::LIBZSTD
+    PkgConfig::TINYXML2
+    BZip2::BZip2
+    ZLIB::ZLIB
+)
+if(OPENSSL_FOUND)
+    target_link_libraries(uuu-helper PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+if(APPLE)
+    target_link_libraries(uuu-helper PRIVATE
+        "-framework IOKit" "-framework CoreFoundation" "-framework Security")
+endif()
+
+# Place the helper next to the app executable so applicationDirPath() finds it
+# (on macOS this is uuuapp.app/Contents/MacOS). Done via an always-run target
+# rather than a POST_BUILD on uuuapp, so the copy refreshes even when only the
+# helper was rebuilt and uuuapp itself did not relink.
+add_custom_target(bundle-helper ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:uuu-helper> $<TARGET_FILE_DIR:uuuapp>
+    COMMENT "Bundling uuu-helper next to uuuapp")
+add_dependencies(bundle-helper uuu-helper uuuapp)
+
 # Install
 install(TARGETS uuuapp
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
 )
+install(TARGETS uuu-helper RUNTIME DESTINATION bin)

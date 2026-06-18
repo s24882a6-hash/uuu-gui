@@ -19,9 +19,6 @@ public:
 
 private slots:
     void onTypeChanged();
-    void browseBin4g();
-    void browseBin();
-    void browseWic();
     void validate();
 
 private:

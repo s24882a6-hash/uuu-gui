@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QTranslator>
 
+class QGroupBox;
 class QListWidget;
 class QListWidgetItem;
 class QComboBox;
@@ -43,8 +44,12 @@ private slots:
 
     // Flash
     void flashSelected();
-    void flashDevice(DeviceItemWidget* widget);
     void flashDevice(DeviceItemWidget* widget, const FirmwarePreset& preset);
+    void onDevicePermissionError(DeviceItemWidget* widget);
+    void onDeviceAuthFailed(DeviceItemWidget* widget);
+    // Obtain the session password (prompting once) and retry the device elevated.
+    // Serialized so parallel flashes don't stack password dialogs.
+    void requestElevation(DeviceItemWidget* widget, bool passwordWasWrong);
 
     // Auto-flash
     void onAutoFlashToggled(bool enabled);
@@ -64,27 +69,30 @@ private:
     void refreshPresetList();
     void retranslateUi();
     void applyLanguage(const QString& lang);
-    void applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix);
+    void applySettings();
     FirmwarePreset* selectedPreset();
     void addDeviceWidget(const UsbDevice& dev);
-
-    QString currentUuuPath()    const { return m_uuuPath;    }
-    QString currentSudoPrefix() const { return m_sudoPrefix; }
+    // Prompt for the administrator password (cached for the session). Returns
+    // false if the user cancelled.
+    bool promptPassword(bool incorrect);
 
     // --- Data ---
     QList<FirmwarePreset> m_presets;
     DeviceMonitor*        m_monitor          = nullptr;
     int                   m_activeFlashCount = 0;
-    QString               m_uuuPath;
-    QString               m_sudoPrefix;
+    QString               m_helperPath;
+    QString               m_sessionPassword;     // cached administrator password
+    bool                  m_useElevation     = false;
+    bool                  m_promptInProgress = false;
+    QList<DeviceItemWidget*> m_pendingElevation; // devices awaiting the in-flight prompt
     QTranslator           m_translator;
 
     // busId → widget
     QMap<QString, DeviceItemWidget*> m_deviceWidgets;
 
     // --- UI elements ---
-    class QGroupBox* m_groupPresets = nullptr;
-    class QGroupBox* m_groupDevices = nullptr;
+    QGroupBox* m_groupPresets = nullptr;
+    QGroupBox* m_groupDevices = nullptr;
     QListWidget* m_presetList   = nullptr;
     QPushButton* m_btnAdd       = nullptr;
     QPushButton* m_btnEdit      = nullptr;

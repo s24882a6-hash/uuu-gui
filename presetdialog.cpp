@@ -1,4 +1,5 @@
 #include "presetdialog.h"
+#include <QUuid>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -107,9 +108,16 @@ void PresetDialog::setupUi()
     connect(m_rdSimple,  &QRadioButton::toggled, this, &PresetDialog::onTypeChanged);
     connect(m_rdEmmc,    &QRadioButton::toggled, this, &PresetDialog::onTypeChanged);
     connect(m_rdEmmc4g,  &QRadioButton::toggled, this, &PresetDialog::onTypeChanged);
-    connect(m_btnBin4g,  &QPushButton::clicked,  this, &PresetDialog::browseBin4g);
-    connect(m_btnBin,    &QPushButton::clicked,  this, &PresetDialog::browseBin);
-    connect(m_btnWic,    &QPushButton::clicked,  this, &PresetDialog::browseWic);
+
+    auto browseFile = [this](QLineEdit* field, const QString& title) {
+        return [this, field, title]() {
+            QString path = QFileDialog::getOpenFileName(this, title, field->text());
+            if (!path.isEmpty()) field->setText(path);
+        };
+    };
+    connect(m_btnBin4g, &QPushButton::clicked, this, browseFile(m_bin4gPath, tr("Select 4G init file")));
+    connect(m_btnBin,   &QPushButton::clicked, this, browseFile(m_binPath,   tr("Select boot file")));
+    connect(m_btnWic,   &QPushButton::clicked, this, browseFile(m_wicPath,   tr("Select image file")));
     connect(m_name,      &QLineEdit::textChanged, this, &PresetDialog::validate);
     connect(m_bin4gPath, &QLineEdit::textChanged, this, &PresetDialog::validate);
     connect(m_binPath,   &QLineEdit::textChanged, this, &PresetDialog::validate);
@@ -156,33 +164,6 @@ void PresetDialog::onTypeChanged()
         : tr("Boot file (.bin / .imx):"));
 
     validate();
-}
-
-void PresetDialog::browseBin4g()
-{
-    QString path = QFileDialog::getOpenFileName(
-        this, tr("Select 4G init file"), m_bin4gPath->text(),
-        tr("Binary files (*.bin *.imx);;All files (*)"));
-    if (!path.isEmpty())
-        m_bin4gPath->setText(path);
-}
-
-void PresetDialog::browseBin()
-{
-    QString path = QFileDialog::getOpenFileName(
-        this, tr("Select boot file"), m_binPath->text(),
-        tr("Binary files (*.bin *.imx);;All files (*)"));
-    if (!path.isEmpty())
-        m_binPath->setText(path);
-}
-
-void PresetDialog::browseWic()
-{
-    QString path = QFileDialog::getOpenFileName(
-        this, tr("Select image file"), m_wicPath->text(),
-        tr("WIC images (*.wic *.img);;All files (*)"));
-    if (!path.isEmpty())
-        m_wicPath->setText(path);
 }
 
 void PresetDialog::validate()

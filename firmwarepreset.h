@@ -22,8 +22,10 @@ public:
     FirmwarePreset() = default;
     explicit FirmwarePreset(const QString& name);
 
-    // Returns one or more argument lists, each to be passed as a separate uuu invocation
-    QList<QStringList> buildAllPhases() const;
+    // Returns one or more phases, each a uuu-helper action argument list
+    // (e.g. {"--boot", file} or {"--emmcall", bootloader, wic}). Each phase is
+    // run as a separate helper process.
+    QList<QStringList> buildHelperPhases() const;
 
     bool    isValid()      const;
     QString description()  const;

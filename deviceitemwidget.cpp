@@ -7,7 +7,6 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
-#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QFrame>
@@ -68,7 +67,6 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
     setObjectName("deviceItem");
     setStyleSheet("#deviceItem { border-bottom: 1px solid palette(mid); }");
 
-    connect(m_check,    &QCheckBox::stateChanged, this, [this](int) { emit checkStateChanged(); }); // NOLINT: stateChanged needed for Qt < 6.9 compat
     connect(m_btnLog,   &QPushButton::clicked,         this, &DeviceItemWidget::showLog);
     connect(m_btnFlash, &QPushButton::clicked, this, [this]() {
         if (isFlashing())
@@ -80,7 +78,10 @@ DeviceItemWidget::DeviceItemWidget(const UsbDevice& device, QWidget* parent)
 
 DeviceItemWidget::~DeviceItemWidget()
 {
-    delete m_logDialog;
+    if (m_logFile.isOpen()) {
+        m_logStream.flush();
+        m_logFile.close();
+    }
 }
 
 bool DeviceItemWidget::isChecked() const
@@ -93,34 +94,33 @@ bool DeviceItemWidget::isFlashing() const
     return m_worker && m_worker->isActive();
 }
 
-void DeviceItemWidget::flash(const QString& uuuPath,
+void DeviceItemWidget::ensureWorker()
+{
+    if (m_worker) return;
+    m_worker = new FlashWorker(this);
+    connect(m_worker, &FlashWorker::progressChanged, this, &DeviceItemWidget::onProgress);
+    connect(m_worker, &FlashWorker::phaseChanged,    this, &DeviceItemWidget::onPhaseChanged);
+    connect(m_worker, &FlashWorker::logLine,         this, &DeviceItemWidget::onLogLine);
+    connect(m_worker, &FlashWorker::finished,        this, &DeviceItemWidget::onFlashFinished);
+    // Surface elevation needs to the main window, which owns the session password.
+    connect(m_worker, &FlashWorker::permissionError, this, &DeviceItemWidget::permissionDenied);
+    connect(m_worker, &FlashWorker::authFailed,      this, &DeviceItemWidget::authFailed);
+}
+
+void DeviceItemWidget::flash(const QString& helperPath,
                               const FirmwarePreset& preset,
-                              const QString& sudoPrefix,
-                              bool rebootAfter)
+                              bool rebootAfter,
+                              const QString& password)
 {
     if (isFlashing()) return;
 
-    m_lastUuuPath     = uuuPath;
-    m_lastPreset      = preset;
-    m_lastSudoPrefix  = sudoPrefix;
-    m_lastRebootAfter = rebootAfter;
-
-    if (!m_worker) {
-        m_worker = new FlashWorker(this);
-        connect(m_worker, &FlashWorker::progressChanged, this, &DeviceItemWidget::onProgress);
-        connect(m_worker, &FlashWorker::phaseChanged,    this, &DeviceItemWidget::onPhaseChanged);
-        connect(m_worker, &FlashWorker::logLine,         this, &DeviceItemWidget::onLogLine);
-        connect(m_worker, &FlashWorker::finished,        this, &DeviceItemWidget::onFlashFinished);
-#ifdef Q_OS_LINUX
-        connect(m_worker, &FlashWorker::permissionError, this, &DeviceItemWidget::onPermissionError);
-#endif
-    }
-
-    m_worker->setUuuPath(uuuPath);
+    ensureWorker();
+    m_helperPath = helperPath;
+    m_worker->setHelperPath(helperPath);
     m_worker->setPreset(preset);
     m_worker->setDevice(m_device);
-    m_worker->setPrivilegePrefix(sudoPrefix);
     m_worker->setRebootAfterFlash(rebootAfter);
+    m_worker->setElevation(!password.isEmpty(), password);
 
     if (!m_logDialog)
         m_logDialog = new LogDialog(m_device.displayName(), this);
@@ -132,7 +132,7 @@ void DeviceItemWidget::flash(const QString& uuuPath,
         m_logStream.flush();
         m_logFile.close();
     }
-    QSettings s("uuuapp", "UUUFlashTool");
+    QSettings s;
     if (s.value("saveLogs", false).toBool()) {
         QString dir = s.value("logDir").toString();
         if (!dir.isEmpty() && QDir().mkpath(dir)) {
@@ -156,34 +156,40 @@ void DeviceItemWidget::flash(const QString& uuuPath,
     m_worker->start();
 }
 
-void DeviceItemWidget::reboot(const QString& uuuPath, const QString& sudoPrefix)
-{
-    if (isFlashing()) return;
-
-    if (!m_worker) {
-        m_worker = new FlashWorker(this);
-        connect(m_worker, &FlashWorker::progressChanged, this, &DeviceItemWidget::onProgress);
-        connect(m_worker, &FlashWorker::logLine,         this, &DeviceItemWidget::onLogLine);
-        connect(m_worker, &FlashWorker::finished,        this, &DeviceItemWidget::onFlashFinished);
-    }
-
-    m_worker->setUuuPath(uuuPath);
-    m_worker->setDevice(m_device);
-    m_worker->setPrivilegePrefix(sudoPrefix);
-
-    if (!m_logDialog)
-        m_logDialog = new LogDialog(m_device.displayName(), this);
-    else
-        m_logDialog->setStatus(tr("Rebooting…"));
-
-    setFlashingState(true);
-    m_lblStatus->setText(tr("Rebooting…"));
-    m_worker->startReboot();
-}
-
 void DeviceItemWidget::cancelFlash()
 {
     if (m_worker) m_worker->cancel();
+}
+
+void DeviceItemWidget::retryElevated(const QString& password)
+{
+    if (!m_worker) return;
+    if (m_logDialog) m_logDialog->appendLine(tr("Retrying with administrator privileges…"));
+    m_worker->setElevation(true, password);
+    setFlashingState(true);
+    m_worker->start();
+}
+
+bool DeviceItemWidget::isElevated() const
+{
+    return m_worker && m_worker->isElevated();
+}
+
+void DeviceItemWidget::abortFlash(const QString& message)
+{
+    if (m_logFile.isOpen()) {
+        m_logStream << "\n=== FAILED: " << message << " ===\n";
+        m_logStream.flush();
+        m_logFile.close();
+    }
+    setFlashingState(false);
+    m_lblStatus->setText(tr("Error"));
+    m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
+    if (m_logDialog) {
+        m_logDialog->appendLine(QString("\n[ERROR] %1").arg(message));
+        m_logDialog->setStatus(tr("Error"));
+    }
+    emit flashDone(false);
 }
 
 void DeviceItemWidget::changeEvent(QEvent* event)
@@ -269,28 +275,3 @@ void DeviceItemWidget::setFlashingState(bool active)
     m_btnFlash->setText(active ? tr("Cancel") : tr("Flash"));
     if (!active) { m_bar->setValue(0); m_lblPct->setText("0%"); m_lblPhase->setVisible(false); }
 }
-
-#ifdef Q_OS_LINUX
-void DeviceItemWidget::onPermissionError()
-{
-    setFlashingState(false);
-
-    if (m_logDialog)
-        m_logDialog->appendLine(tr("\n[ERROR] Permission denied accessing USB device."));
-
-    auto reply = QMessageBox::question(
-        this,
-        tr("Permission denied"),
-        tr("Cannot open USB device — permission denied.\n\n"
-           "Retry with pkexec (a password dialog will appear)?"),
-        QMessageBox::Yes | QMessageBox::No);
-
-    if (reply == QMessageBox::Yes) {
-        flash(m_lastUuuPath, m_lastPreset, "pkexec", m_lastRebootAfter);
-    } else {
-        m_lblStatus->setText(tr("Error"));
-        m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
-        emit flashDone(false);
-    }
-}
-#endif

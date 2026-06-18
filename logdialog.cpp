@@ -1,8 +1,6 @@
 #include "logdialog.h"
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QPlainTextEdit>
-#include <QPushButton>
 #include <QScrollBar>
 #include <QFontDatabase>
 
@@ -14,23 +12,18 @@ LogDialog::LogDialog(const QString& deviceName, QWidget* parent)
     setMinimumSize(640, 400);
 
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     m_log = new QPlainTextEdit(this);
     m_log->setReadOnly(true);
+    m_log->setMaximumBlockCount(5000);
 
     QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     mono.setPointSize(10);
     m_log->setFont(mono);
 
     layout->addWidget(m_log);
-
-    auto* btnClose = new QPushButton(tr("Close"), this);
-    auto* btnLayout = new QHBoxLayout;
-    btnLayout->addStretch();
-    btnLayout->addWidget(btnClose);
-    layout->addLayout(btnLayout);
-
-    connect(btnClose, &QPushButton::clicked, this, &QDialog::hide);
 }
 
 void LogDialog::appendLine(const QString& line)

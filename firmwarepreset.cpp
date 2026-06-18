@@ -8,15 +8,15 @@ FirmwarePreset::FirmwarePreset(const QString& name)
     , name(name)
 {}
 
-QList<QStringList> FirmwarePreset::buildAllPhases() const
+QList<QStringList> FirmwarePreset::buildHelperPhases() const
 {
     switch (type) {
     case Type::SimpleBin:
-        return { { binPath } };
+        return { { "--boot", binPath } };
     case Type::EmmcAll:
-        return { { "-b", "emmc_all", binPath, wicPath } };
+        return { { "--emmcall", binPath, wicPath } };
     case Type::EmmcAll4G:
-        return { { bin4gPath }, { "-b", "emmc_all", binPath, wicPath } };
+        return { { "--boot", bin4gPath }, { "--emmcall", binPath, wicPath } };
     }
     return {};
 }
@@ -57,6 +57,7 @@ QString FirmwarePreset::description() const
 QJsonObject FirmwarePreset::toJson() const
 {
     QJsonObject obj;
+    obj["version"]    = 1;
     obj["id"]         = id;
     obj["name"]       = name;
     obj["type"]       = static_cast<int>(type);
@@ -72,7 +73,10 @@ FirmwarePreset FirmwarePreset::fromJson(const QJsonObject& obj)
     FirmwarePreset p;
     p.id       = obj["id"].toString(QUuid::createUuid().toString(QUuid::WithoutBraces));
     p.name     = obj["name"].toString();
-    p.type     = static_cast<Type>(obj["type"].toInt(0));
+    int typeInt = obj["type"].toInt(0);
+    if (typeInt < 0 || typeInt > static_cast<int>(Type::EmmcAll4G))
+        typeInt = 0;
+    p.type = static_cast<Type>(typeInt);
     p.bin4gPath  = obj["bin4gPath"].toString();
     p.binPath    = obj["binPath"].toString();
     p.wicPath    = obj["wicPath"].toString();

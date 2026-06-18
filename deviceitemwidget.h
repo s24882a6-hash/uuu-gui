@@ -23,17 +23,23 @@ public:
     bool isChecked() const;
     bool isFlashing() const;
 
-    void flash(const QString& uuuPath,
+    void flash(const QString& helperPath,
                const FirmwarePreset& preset,
-               const QString& sudoPrefix,
-               bool rebootAfter = false);
-    void reboot(const QString& uuuPath, const QString& sudoPrefix);
+               bool rebootAfter = false,
+               const QString& password = {});   // empty = run unprivileged
     void cancelFlash();
 
+    // Re-run the current flash elevated, feeding `password` to sudo.
+    void retryElevated(const QString& password);
+    bool isElevated() const;
+    // Abort with an error message (e.g. when the user cancels the password prompt).
+    void abortFlash(const QString& message);
+
 signals:
-    void checkStateChanged();
     void flashRequested();
     void flashDone(bool success);
+    void permissionDenied();   // device access denied — caller may elevate
+    void authFailed();         // sudo password was wrong
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -44,25 +50,19 @@ private slots:
     void onLogLine(const QString& line);
     void onFlashFinished(bool success, const QString& err);
     void showLog();
-#ifdef Q_OS_LINUX
-    void onPermissionError();
-#endif
 
 private:
     void setFlashingState(bool active);
     void retranslateUi();
+    void ensureWorker();
 
     UsbDevice       m_device;
+    QString         m_helperPath;
     FlashWorker*    m_worker    = nullptr;
     LogDialog*      m_logDialog = nullptr;
 
     QFile           m_logFile;
     QTextStream     m_logStream;
-
-    QString        m_lastUuuPath;
-    FirmwarePreset m_lastPreset;
-    QString        m_lastSudoPrefix;
-    bool           m_lastRebootAfter = false;
 
     QCheckBox*   m_check     = nullptr;
     QLabel*      m_lblName   = nullptr;

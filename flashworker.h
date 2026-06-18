@@ -6,47 +6,59 @@
 #include <QTimer>
 
 
+// Drives a flash by spawning the bundled `uuu-helper` (one process per phase).
+// The helper links libuuu and emits structured JSON progress on stdout, so this
+// class no longer scrapes human-readable text or tracks USB re-enumeration —
+// libuuu re-finds the device by serial on its own.
 class FlashWorker : public QObject
 {
     Q_OBJECT
 public:
     explicit FlashWorker(QObject* parent = nullptr);
 
-    void setUuuPath(const QString& path)       { m_uuuPath = path; }
+    void setHelperPath(const QString& path)    { m_helperPath = path; }
     void setPreset(const FirmwarePreset& p)    { m_preset  = p;    }
     void setDevice(const UsbDevice& dev)       { m_device  = dev;  }
-    void setPrivilegePrefix(const QString& p)  { m_sudoPrefix = p; }
     void setRebootAfterFlash(bool reboot)      { m_rebootAfterFlash = reboot; }
 
+    // Run the helper under `sudo -S`, feeding `password` to sudo's stdin.
+    void setElevation(bool useSudo, const QString& password)
+    { m_elevated = useSudo; m_password = password; }
+    bool isElevated() const { return m_elevated; }
+
     void start();
-    void startReboot();
     void cancel();
 
     bool     isRunning() const;
     bool     isActive()  const { return m_active; }
-    QString  deviceBusId() const { return m_device.busId; }
 
 signals:
     void progressChanged(int percent);
     void phaseChanged(int current, int total);
     void logLine(QString line);
     void finished(bool success, QString errorMsg);
-    void permissionError();
+    void permissionError();   // device access denied (needs / not helped by sudo)
+    void authFailed();        // sudo could not authenticate (wrong password)
 
 private slots:
     void onReadyRead();
     void onFinished(int exitCode, QProcess::ExitStatus status);
-    void startCurrentPhase();
+    void onErrorOccurred(QProcess::ProcessError error);
+    void launchCurrentPhase();
 
 private:
+    void        ensureProcess();
+    void        resetRunState();
     QStringList buildPhaseCommand(int phaseIndex) const;
-    QString     scanForFastbootBusId() const;
-    void parseLine(const QString& line);
+    void        processLineBuffer();
+    void        handleEvent(const QByteArray& jsonLine);
 
-    QString            m_uuuPath;
+    QString            m_helperPath;
     FirmwarePreset     m_preset;
     UsbDevice          m_device;
-    QString            m_sudoPrefix;
+
+    bool               m_elevated          = false;
+    QString            m_password;
 
     QProcess*          m_process           = nullptr;
     QTimer*            m_phaseTimer        = nullptr;
@@ -55,8 +67,7 @@ private:
     bool               m_active            = false;
     bool               m_rebootAfterFlash  = false;
     bool               m_permissionError   = false;
-    int                m_stepsDone         = 0;
-    int                m_stepsTotal        = 0;
-    int                m_busIdScanRetries  = 0;
-    bool               m_lastWasCmd        = false;
+    bool               m_sudoAuthFailed    = false;
+    QString            m_lastError;
+    QByteArray         m_lineBuffer;
 };

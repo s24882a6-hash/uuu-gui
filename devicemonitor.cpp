@@ -1,7 +1,8 @@
 #include "devicemonitor.h"
 #include <QMap>
 #include <QProcess>
-#include <QRegularExpression>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #ifdef HAVE_LIBUSB
 #  include <libusb.h>
@@ -32,12 +33,6 @@ QString UsbDevice::displayName() const
     return name;
 }
 
-QString UsbDevice::uuuDevArg() const
-{
-    // busId is the exact path from "uuu -lsusb", e.g. "1:12"
-    return busId;
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // DeviceMonitorThread
 // ──────────────────────────────────────────────────────────────────────────────
@@ -51,11 +46,10 @@ void DeviceMonitorThread::stop()
     m_stop = true;
 }
 
-void DeviceMonitorThread::setUuuPath(const QString& path, const QString& sudoPrefix)
+void DeviceMonitorThread::setHelperPath(const QString& path)
 {
-    QMutexLocker lk(&m_uuuMutex);
-    m_uuuPath    = path;
-    m_sudoPrefix = sudoPrefix;
+    QMutexLocker lk(&m_helperMutex);
+    m_helperPath = path;
 }
 
 bool DeviceMonitorThread::isNxpDevice(quint16 vid)
@@ -63,74 +57,67 @@ bool DeviceMonitorThread::isNxpDevice(quint16 vid)
     return vid == VID_NXP || vid == VID_FREESCALE;
 }
 
-// Parse "uuu -lsusb" output into a device map.
-// Output format (columns are whitespace-separated after initial indent):
-//   Path   Chip   Protocol   Vid      Pid      BcdVersion   Serial_no
-//   1:12   MX865  SDPS:      0x1FC9   0x0146   0x0002       221DB000727DE5AC
-QMap<QString, UsbDevice> DeviceMonitorThread::scanViaUuu()
+// Parse "uuu-helper list" output: one JSON object per line, e.g.
+//   {"event":"device","path":"1:12","chip":"MX865","pro":"SDPS:",
+//    "vid":8137,"pid":326,"bcd":2,"serial":"221DB000727DE5AC"}
+QList<UsbDevice> DeviceMonitorThread::parseHelperList(const QByteArray& output)
 {
-    QMap<QString, UsbDevice> result;
+    QList<UsbDevice> devices;
 
-    QString uuuPath, sudoPrefix;
-    {
-        QMutexLocker lk(&m_uuuMutex);
-        uuuPath    = m_uuuPath;
-        sudoPrefix = m_sudoPrefix;
+    for (const QByteArray& rawLine : output.split('\n')) {
+        const QByteArray line = rawLine.trimmed();
+        if (line.isEmpty()) continue;
+
+        QJsonParseError err{};
+        QJsonDocument doc = QJsonDocument::fromJson(line, &err);
+        if (err.error != QJsonParseError::NoError || !doc.isObject()) continue;
+
+        const QJsonObject obj = doc.object();
+        if (obj.value("event").toString() != "device") continue;
+
+        const QString path = obj.value("path").toString();
+        if (path.split(':').size() != 2) continue;   // expect "bus:addr"
+
+        quint16 vid = static_cast<quint16>(obj.value("vid").toInt());
+        if (!isNxpDevice(vid)) continue;
+
+        UsbDevice dev;
+        dev.busId        = path;
+        dev.vendorId     = vid;
+        dev.productId    = static_cast<quint16>(obj.value("pid").toInt());
+        dev.serialNumber = obj.value("serial").toString();
+
+        devices << dev;
     }
 
-    if (uuuPath.isEmpty()) return result;
+    return devices;
+}
+
+QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
+{
+    QString helperPath;
+    {
+        QMutexLocker lk(&m_helperMutex);
+        helperPath = m_helperPath;
+    }
+
+    if (helperPath.isEmpty()) return {};
 
     QProcess proc;
-    // Always scan without privilege prefix — listing devices doesn't need root,
-    // and sudo/pkexec without a terminal would block waiting for a password.
-    proc.setProgram(uuuPath);
-    proc.setArguments({"-lsusb"});
+    // Always list without elevation — enumerating devices doesn't need root, and
+    // sudo without a terminal would block waiting for a password.
+    proc.setProgram(helperPath);
+    proc.setArguments({"list"});
     proc.start();
     if (!proc.waitForFinished(3000)) {
         proc.kill();
-        return result;
+        return {};
     }
 
-    const QString output = QString::fromLocal8Bit(
-        proc.readAllStandardOutput() + proc.readAllStandardError());
-
-    bool pastHeader = false;
-    static const QRegularExpression reSpaces(R"(\s+)");
-
-    for (const QString& rawLine : output.split('\n')) {
-        const QString line = rawLine.trimmed();
-
-        // The separator line marks the start of actual device rows
-        if (line.startsWith("====")) { pastHeader = true; continue; }
-        if (!pastHeader || line.isEmpty()) continue;
-
-        // Each device line: "path chip proto vid pid bcd serial"
-        QStringList fields = line.split(reSpaces, Qt::SkipEmptyParts);
-        if (fields.size() < 5) continue;
-
-        // Path must look like "N:M"
-        const QString& path = fields[0];
-        if (!path.contains(':')) continue;
-
-        bool ok;
-        quint16 vid = fields[3].toUInt(&ok, 16); if (!ok) continue;
-        quint16 pid = fields[4].toUInt(&ok, 16); if (!ok) continue;
-        if (!isNxpDevice(vid)) continue;
-
-        QStringList parts = path.split(':');
-        if (parts.size() != 2) continue;
-
-        UsbDevice dev;
-        dev.busId      = path;
-        dev.vendorId   = vid;
-        dev.productId  = pid;
-        dev.busNumber  = static_cast<quint8>(parts[0].toUInt());
-        dev.devAddress = static_cast<quint8>(parts[1].toUInt());
-        if (fields.size() > 6) dev.serialNumber = fields[6];
-
+    QMap<QString, UsbDevice> result;
+    const QByteArray output = proc.readAllStandardOutput();
+    for (const UsbDevice& dev : parseHelperList(output))
         result[dev.busId] = dev;
-    }
-
     return result;
 }
 
@@ -159,15 +146,10 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaLibusb()
         dev.busId      = id;
         dev.vendorId   = desc.idVendor;
         dev.productId  = desc.idProduct;
-        dev.busNumber  = bus;
-        dev.devAddress = addr;
 
         libusb_device_handle* handle = nullptr;
         if (m_openAllowed.load() && libusb_open(list[i], &handle) == 0) {
             unsigned char buf[256] = {};
-            if (desc.iManufacturer &&
-                libusb_get_string_descriptor_ascii(handle, desc.iManufacturer, buf, sizeof(buf)) > 0)
-                dev.manufacturer = QString::fromLatin1(reinterpret_cast<char*>(buf));
             if (desc.iProduct &&
                 libusb_get_string_descriptor_ascii(handle, desc.iProduct, buf, sizeof(buf)) > 0)
                 dev.product = QString::fromLatin1(reinterpret_cast<char*>(buf));
@@ -189,38 +171,45 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaLibusb()
 void DeviceMonitorThread::run()
 {
     QMap<QString, UsbDevice> known;
-    bool uuuModeActive = false;
+    bool helperModeActive  = false;
+    bool noLibusbWarned    = false;
 
     while (!m_stop) {
-        QString uuuPath;
-        { QMutexLocker lk(&m_uuuMutex); uuuPath = m_uuuPath; }
+        QString helperPath;
+        { QMutexLocker lk(&m_helperMutex); helperPath = m_helperPath; }
 
         QMap<QString, UsbDevice> current;
 
-        if (!uuuPath.isEmpty()) {
-            // Skip scanning while flashing — uuu has exclusive device access
+        if (!helperPath.isEmpty()) {
+            // Skip scanning while flashing — the helper has exclusive device access
             if (!m_openAllowed.load()) {
                 msleep(500);
                 continue;
             }
-            current = scanViaUuu();
-            if (!uuuModeActive) {
-                uuuModeActive = true;
+            current = scanViaHelper();
+            if (!helperModeActive) {
+                helperModeActive = true;
+                noLibusbWarned   = false;
                 // Clear known so we don't emit spurious disconnects when switching modes
                 known.clear();
             }
         } else {
+            if (helperModeActive) {
+                // Switching away from helper mode — let known devices emit disconnects below
+                helperModeActive = false;
+                known.clear();
+            }
 #ifdef HAVE_LIBUSB
             current = scanViaLibusb();
 #else
-            if (!uuuModeActive) {
+            if (!noLibusbWarned) {
                 emit monitoringUnavailable(
-                    "Set a uuu binary path to enable device detection.\n"
+                    "The bundled uuu-helper was not found.\n"
                     "Alternatively, install libusb and rebuild:\n"
                     "  macOS:   brew install libusb\n"
                     "  Linux:   sudo apt install libusb-1.0-0-dev\n"
                     "  Windows: vcpkg install libusb");
-                uuuModeActive = true; // suppress repeated emissions
+                noLibusbWarned = true;
             }
             msleep(500);
             continue;
@@ -273,7 +262,7 @@ void DeviceMonitor::stop()
 {
     if (m_thread->isRunning()) {
         m_thread->stop();
-        m_thread->wait(2000);
+        m_thread->wait(4000); // > 3000ms proc.waitForFinished in scanViaHelper
     }
 }
 
@@ -282,7 +271,7 @@ void DeviceMonitor::setOpenAllowed(bool allowed)
     m_thread->setOpenAllowed(allowed);
 }
 
-void DeviceMonitor::setUuuPath(const QString& path, const QString& sudoPrefix)
+void DeviceMonitor::setHelperPath(const QString& path)
 {
-    m_thread->setUuuPath(path, sudoPrefix);
+    m_thread->setHelperPath(path);
 }

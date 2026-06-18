@@ -3,6 +3,8 @@
 
 class QCheckBox;
 class QComboBox;
+class QGroupBox;
+class QLabel;
 class QLineEdit;
 class QPushButton;
 
@@ -12,30 +14,25 @@ class SettingsDialog : public QDialog
 public:
     explicit SettingsDialog(QWidget* parent = nullptr);
 
-    QString uuuPath()        const;
-    QString privilegePrefix() const;
-    QString language()       const;
-    bool    saveLogsEnabled() const;
-    QString logDir()         const;
-
 signals:
     void languageChanged(const QString& lang);
     void settingsSaved();
 
+protected:
+    void changeEvent(QEvent* event) override;
+
 private slots:
-    void browseUuu();
     void browseLogDir();
     void save();
 
 private:
     void setupUi();
     void loadFromSettings();
+    void retranslateUi();
 
-    static QStringList findUuuBinaries();
-
-    QComboBox*   m_uuuCombo    = nullptr;
-    QPushButton* m_uuuBrowse   = nullptr;
-    QComboBox*   m_sudoCombo   = nullptr;
+    QGroupBox*   m_generalGroup = nullptr;
+    QGroupBox*   m_logsGroup    = nullptr;
+    QLabel*      m_langLabel    = nullptr;
     QComboBox*   m_langCombo   = nullptr;
     QCheckBox*   m_chkSaveLogs = nullptr;
     QLineEdit*   m_logDirEdit  = nullptr;

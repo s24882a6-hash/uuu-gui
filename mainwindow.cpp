@@ -2,6 +2,7 @@
 #include "presetdialog.h"
 #include "deviceitemwidget.h"
 #include "settingsdialog.h"
+#include "apppaths.h"
 
 #include <QApplication>
 #include <QEvent>
@@ -12,7 +13,9 @@
 #include <QFileInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPainter>
@@ -26,7 +29,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QStandardPaths>
 
 static constexpr int kPresetDescRole = Qt::UserRole + 1;
 
@@ -114,8 +116,7 @@ MainWindow::MainWindow(QWidget* parent)
     loadSettings();
     refreshPresetList();
 
-    if (!m_uuuPath.isEmpty() && QFileInfo::exists(m_uuuPath))
-        m_monitor->setUuuPath(m_uuuPath, m_sudoPrefix);
+    m_helperPath = AppPaths::helper();
 
     connect(m_monitor, &DeviceMonitor::deviceConnected,
             this, &MainWindow::onDeviceConnected);
@@ -124,11 +125,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_monitor, &DeviceMonitor::monitoringUnavailable,
             this, &MainWindow::onMonitoringUnavailable);
 
+    applySettings();
     m_monitor->start();
-
-    // Reflect loaded uuu path in status bar
-    if (!m_uuuPath.isEmpty())
-        applyUuuSettings(m_uuuPath, m_sudoPrefix);
 }
 
 MainWindow::~MainWindow()
@@ -154,7 +152,7 @@ void MainWindow::retranslateUi()
     setWindowTitle(tr("UUU Flash Tool") + " v" + QCoreApplication::applicationVersion());
     if (m_groupPresets) m_groupPresets->setTitle(tr("Firmware Presets"));
     if (m_groupDevices) m_groupDevices->setTitle(tr("Connected Devices"));
-    m_btnAdd->setText(tr("+  Add"));
+    m_btnAdd->setText(tr("Add"));
     m_btnEdit->setText(tr("Edit"));
     m_btnDelete->setText(tr("Delete"));
     m_noDevicesLbl->setText(tr("No NXP devices detected.\nConnect a device in recovery / SDP mode."));
@@ -208,7 +206,7 @@ QWidget* MainWindow::makePresetsPanel()
     layout->addWidget(m_presetList);
 
     auto* btnRow = new QHBoxLayout;
-    m_btnAdd    = new QPushButton(tr("+  Add"),  group);
+    m_btnAdd    = new QPushButton(tr("Add"),  group);
     m_btnEdit   = new QPushButton(tr("Edit"),    group);
     m_btnDelete = new QPushButton(tr("Delete"),  group);
     m_btnAdd->setMinimumWidth(0);
@@ -303,25 +301,22 @@ void MainWindow::openSettings()
     SettingsDialog dlg(this);
     connect(&dlg, &SettingsDialog::languageChanged, this, &MainWindow::applyLanguage);
     connect(&dlg, &SettingsDialog::settingsSaved, this, [this]() {
-        QSettings s("uuuapp", "UUUFlashTool");
-        applyUuuSettings(s.value("uuuPath").toString(), s.value("sudoPrefix").toString());
+        applySettings();
     });
     dlg.exec();
 }
 
-void MainWindow::applyUuuSettings(const QString& uuuPath, const QString& sudoPrefix)
+void MainWindow::applySettings()
 {
-    m_uuuPath    = uuuPath;
-    m_sudoPrefix = sudoPrefix;
-
-    if (uuuPath.isEmpty() || !QFileInfo::exists(uuuPath)) {
-        m_statusBar->setText(uuuPath.isEmpty() ? "" : tr("uuu binary not found at: ") + uuuPath);
+    if (m_helperPath.isEmpty() || !QFileInfo::exists(m_helperPath)) {
+        // No bundled helper — DeviceMonitor will fall back to libusb if available.
+        m_statusBar->setText(tr("Built-in uuu-helper not found — limited functionality."));
         m_statusBar->setStyleSheet("color: red;");
-        m_monitor->setUuuPath({}, {});
+        m_monitor->setHelperPath({});
     } else {
-        m_statusBar->setText("uuu: " + uuuPath);
+        m_statusBar->setText(tr("Using built-in libuuu engine"));
         m_statusBar->setStyleSheet("color: green;");
-        m_monitor->setUuuPath(uuuPath, sudoPrefix);
+        m_monitor->setHelperPath(m_helperPath);
     }
 }
 
@@ -449,7 +444,7 @@ void MainWindow::addDeviceWidget(const UsbDevice& dev)
                 tr("Select a firmware preset from the list before flashing."));
             return;
         }
-        flashDevice(w);
+        flashDevice(w, *p);
     });
 
     connect(w, &DeviceItemWidget::flashDone, this, [this](bool){
@@ -458,6 +453,9 @@ void MainWindow::addDeviceWidget(const UsbDevice& dev)
             m_monitor->setOpenAllowed(true);
         }
     });
+
+    connect(w, &DeviceItemWidget::permissionDenied, this, [this, w](){ onDevicePermissionError(w); });
+    connect(w, &DeviceItemWidget::authFailed,       this, [this, w](){ onDeviceAuthFailed(w); });
 }
 
 void MainWindow::onDeviceConnected(UsbDevice dev)
@@ -516,17 +514,11 @@ void MainWindow::onMonitoringUnavailable(QString reason)
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-void MainWindow::flashDevice(DeviceItemWidget* widget)
-{
-    FirmwarePreset* p = selectedPreset();
-    if (!p) return;
-    flashDevice(widget, *p);
-}
-
 void MainWindow::flashDevice(DeviceItemWidget* widget, const FirmwarePreset& preset)
 {
-    if (m_uuuPath.isEmpty() || !QFileInfo::exists(m_uuuPath)) {
-        QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
+    if (m_helperPath.isEmpty() || !QFileInfo::exists(m_helperPath)) {
+        QMessageBox::warning(this, tr("Helper not found"),
+            tr("The bundled uuu-helper executable is missing."));
         return;
     }
 
@@ -538,7 +530,81 @@ void MainWindow::flashDevice(DeviceItemWidget* widget, const FirmwarePreset& pre
 
     ++m_activeFlashCount;
     m_monitor->setOpenAllowed(false);
-    widget->flash(m_uuuPath, preset, m_sudoPrefix, m_chkRebootAfter->isChecked());
+    // Reuse the session password if a previous device already needed elevation.
+    QString password = m_useElevation ? m_sessionPassword : QString();
+    widget->flash(m_helperPath, preset, m_chkRebootAfter->isChecked(), password);
+}
+
+bool MainWindow::promptPassword(bool incorrect)
+{
+    bool ok = false;
+    QString note = incorrect
+        ? tr("Incorrect password — please try again.")
+        : tr("Enter your password to flash with administrator privileges.");
+    QString pw = QInputDialog::getText(this, tr("Administrator password"),
+                                       note, QLineEdit::Password, QString(), &ok);
+    if (!ok) return false;
+    m_sessionPassword = pw;
+    m_useElevation    = true;
+    return true;
+}
+
+void MainWindow::onDevicePermissionError(DeviceItemWidget* widget)
+{
+#ifdef Q_OS_WIN
+    widget->abortFlash(tr("Cannot access the device. Install the WinUSB driver (e.g. via Zadig)."));
+#else
+    // Already ran as root and still denied — a password won't help.
+    if (widget->isElevated()) {
+        widget->abortFlash(tr("Device access denied even with administrator privileges."));
+        return;
+    }
+    requestElevation(widget, /*passwordWasWrong=*/false);
+#endif
+}
+
+void MainWindow::onDeviceAuthFailed(DeviceItemWidget* widget)
+{
+    requestElevation(widget, /*passwordWasWrong=*/true);
+}
+
+void MainWindow::requestElevation(DeviceItemWidget* widget, bool passwordWasWrong)
+{
+    // Reuse a known-good password without prompting.
+    if (!passwordWasWrong && m_useElevation && !m_sessionPassword.isEmpty()) {
+        widget->retryElevated(m_sessionPassword);
+        return;
+    }
+
+    // A password dialog is already open (its modal loop delivers other devices'
+    // errors re-entrantly). Queue this device instead of stacking dialogs.
+    if (m_promptInProgress) {
+        if (!m_pendingElevation.contains(widget))
+            m_pendingElevation << widget;
+        return;
+    }
+
+    if (passwordWasWrong)
+        m_sessionPassword.clear();
+
+    m_promptInProgress = true;
+    bool ok = promptPassword(passwordWasWrong);
+    m_promptInProgress = false;
+
+    // Devices that piled up while the dialog was open.
+    QList<DeviceItemWidget*> pending = m_pendingElevation;
+    m_pendingElevation.clear();
+
+    const QString abortMsg = tr("Administrator password is required to flash this device.");
+    if (!ok) {
+        widget->abortFlash(abortMsg);
+        for (auto* w : pending) w->abortFlash(abortMsg);
+        return;
+    }
+
+    widget->retryElevated(m_sessionPassword);
+    for (auto* w : pending)
+        w->retryElevated(m_sessionPassword);
 }
 
 void MainWindow::flashSelected()
@@ -550,8 +616,9 @@ void MainWindow::flashSelected()
         return;
     }
 
-    if (m_uuuPath.isEmpty() || !QFileInfo::exists(m_uuuPath)) {
-        QMessageBox::warning(this, tr("uuu not found"), tr("Set a valid uuu binary path first."));
+    if (m_helperPath.isEmpty() || !QFileInfo::exists(m_helperPath)) {
+        QMessageBox::warning(this, tr("Helper not found"),
+            tr("The bundled uuu-helper executable is missing."));
         return;
     }
 
@@ -561,7 +628,7 @@ void MainWindow::flashSelected()
         if (!item || !item->widget()) continue;
         auto* w = qobject_cast<DeviceItemWidget*>(item->widget());
         if (!w || !w->isChecked() || w->isFlashing()) continue;
-        flashDevice(w);
+        flashDevice(w, *p);
         any = true;
     }
 
@@ -579,10 +646,7 @@ void MainWindow::onAutoFlashToggled(bool enabled)
 
 void MainWindow::loadSettings()
 {
-    QSettings s("uuuapp", "UUUFlashTool");
-
-    m_uuuPath    = s.value("uuuPath").toString();
-    m_sudoPrefix = s.value("sudoPrefix").toString();
+    QSettings s;
 
     applyLanguage(s.value("language", "en").toString());
 
@@ -601,9 +665,7 @@ void MainWindow::loadSettings()
 
 void MainWindow::saveSettings()
 {
-    QSettings s("uuuapp", "UUUFlashTool");
-    s.setValue("uuuPath",          m_uuuPath);
-    s.setValue("sudoPrefix",       m_sudoPrefix);
+    QSettings s;
     s.setValue("autoFlash",        m_autoFlash->isChecked());
     s.setValue("rebootAfterFlash", m_chkRebootAfter->isChecked());
 
