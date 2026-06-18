@@ -13,7 +13,12 @@ int main(int argc, char* argv[])
     app.setApplicationName("UUUFlashTool");
     app.setOrganizationName("uuuapp");
     app.setApplicationVersion(APP_VERSION);
+#ifndef Q_OS_MAC
+    // On macOS the Dock uses the bundle's .icns (rounded, safe-area); setting a
+    // window icon here would override it with the full-bleed square. Other
+    // platforms need it for the title bar / taskbar.
     app.setWindowIcon(QIcon(":/icons/uuuapp.svg"));
+#endif
 
     // Set default language on first run (detect system locale)
     {

@@ -316,6 +316,11 @@ static int run_phase(const std::vector<std::string>& args)
         rc = uuu_run_cmd_script(script.c_str(), 0);
         if (rc == 0) rc = uuu_wait_uuu_finish(0, 0);
     } else if (haveCmd) {
+        // A command like "FB: reboot" disconnects the device, so
+        // uuu_wait_uuu_finish would otherwise block forever waiting for it to
+        // come back. Bound the waits so this (best-effort) phase returns.
+        uuu_set_wait_timeout(10);       // up to 10s for the device to appear
+        uuu_set_wait_next_timeout(3);   // return ~3s after it drops off the bus
         std::string script = "uuu_version 1.4.0\n" + cmd + "\n";
         rc = uuu_run_cmd_script(script.c_str(), 0);
         if (rc == 0) rc = uuu_wait_uuu_finish(0, 0);

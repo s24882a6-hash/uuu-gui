@@ -100,11 +100,15 @@ jobs:
 
       - name: Generate macOS icon
         run: |
+          # Use the safe-area variant (squircle + transparent margins) so the
+          # Dock icon matches the macOS style.
           mkdir -p uuuapp.iconset
-          for size in 16 32 64 128 256 512; do
-            rsvg-convert -w $size -h $size icons/uuuapp.svg -o uuuapp.iconset/icon_${size}x${size}.png
-          done
-          rsvg-convert -w 1024 -h 1024 icons/uuuapp.svg -o uuuapp.iconset/icon_512x512@2x.png
+          gen() { rsvg-convert -w "$1" -h "$1" icons/uuuapp_macos.svg -o "uuuapp.iconset/$2"; }
+          gen 16  icon_16x16.png;    gen 32   icon_16x16@2x.png
+          gen 32  icon_32x32.png;    gen 64   icon_32x32@2x.png
+          gen 128 icon_128x128.png;  gen 256  icon_128x128@2x.png
+          gen 256 icon_256x256.png;  gen 512  icon_256x256@2x.png
+          gen 512 icon_512x512.png;  gen 1024 icon_512x512@2x.png
           iconutil -c icns uuuapp.iconset -o icons/uuuapp.icns
 
       - name: Build
