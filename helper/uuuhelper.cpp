@@ -204,17 +204,33 @@ static const char* kEmmcAllTemplate =
 
 // Whole-token replacement (tokens are delimited by spaces / newlines), so a
 // substituted path that happens to contain a token isn't re-substituted.
+static bool is_compressed(const std::string& path)
+{
+    // libuuu decompresses .zst/.bz2/.gz on-the-fly only when the path is
+    // followed by "/*" in the script — without it the raw compressed bytes
+    // are written to the device.
+    auto ends = [&](const char* ext) {
+        return path.size() >= std::strlen(ext) &&
+               path.compare(path.size() - std::strlen(ext), std::string::npos, ext) == 0;
+    };
+    return ends(".zst") || ends(".bz2") || ends(".gz") || ends(".xz");
+}
+
 static std::string substitute_tokens(const std::string& tmpl,
                                      const std::string& flashBin,
                                      const std::string& image)
 {
     std::string out;
     std::string tok;
+    // Append "/*" after a compressed image path so libuuu decompresses it.
+    const std::string imageToken = is_compressed(image)
+        ? "\"" + image + "/*\""
+        : "\"" + image + "\"";
     auto flush = [&]() {
         // Quote substituted paths so spaces/parentheses in filenames don't get
         // split by uuu's whitespace-based script tokenizer.
         if (tok == "_flash.bin")    out += "\"" + flashBin + "\"";
-        else if (tok == "_image")   out += "\"" + image + "\"";
+        else if (tok == "_image")   out += imageToken;
         else                        out += tok;
         tok.clear();
     };
