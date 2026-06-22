@@ -82,6 +82,82 @@ jobs:
           name: linux-rpm
           path: uuu-gui-linux.rpm
 
+  build-linux-arm64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev libqt6svg6-dev libusb-1.0-0-dev cmake build-essential git \
+            libzstd-dev libtinyxml2-dev libbz2-dev zlib1g-dev libssl-dev \
+            libgl-dev libfuse2 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 \
+            qt6-gtk-platformtheme librsvg2-bin
+
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build
+          DESTDIR=AppDir cmake --install build
+
+      - name: Build AppImage
+        run: |
+          rsvg-convert -w 256 -h 256 icons/UUUFlashTool.svg -o UUUFlashTool.png
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-aarch64.AppImage
+          chmod +x linuxdeploy-aarch64.AppImage linuxdeploy-plugin-qt-aarch64.AppImage
+          export QMAKE=$(which qmake6 || which qmake)
+          export EXTRA_QT_PLUGINS=platformthemes/libqgtk3.so:styles/libqgtk3.so
+          ./linuxdeploy-aarch64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --executable AppDir/usr/bin/uuu-helper \
+            --desktop-file UUUFlashTool.desktop \
+            --icon-file UUUFlashTool.png \
+            --output appimage
+          mv UUU_Flash_Tool-aarch64.AppImage uuu-gui-linux-arm64.AppImage
+
+      - name: Build .deb and .rpm
+        run: |
+          sudo apt-get install -y alien
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
+                   deb/usr/share/icons/hicolor/256x256/apps
+          cp AppDir/usr/bin/UUUFlashTool deb/usr/bin/
+          cp AppDir/usr/bin/uuu-helper    deb/usr/bin/
+          cp UUUFlashTool.desktop deb/usr/share/applications/
+          cp UUUFlashTool.png     deb/usr/share/icons/hicolor/256x256/apps/UUUFlashTool.png
+          cat > deb/DEBIAN/control << EOF
+          Package: uuu-gui
+          Version: ${VERSION}
+          Architecture: arm64
+          Maintainer: uuu-gui
+          Depends: libqt6widgets6, libqt6svg6, libusb-1.0-0, libzstd1, libtinyxml2-9, libbz2-1.0, zlib1g, libssl3
+          Description: NXP UUU firmware flashing GUI
+          EOF
+          dpkg-deb --build deb uuu-gui-linux-arm64.deb
+          sudo alien --to-rpm --scripts uuu-gui-linux-arm64.deb
+          mv *.rpm uuu-gui-linux-arm64.rpm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-appimage
+          path: uuu-gui-linux-arm64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-deb
+          path: uuu-gui-linux-arm64.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-rpm
+          path: uuu-gui-linux-arm64.rpm
+
   build-macos:
     runs-on: macos-latest
     steps:
@@ -165,7 +241,7 @@ jobs:
           path: uuu-gui-windows.zip
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-linux-arm64, build-macos, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,5 +259,8 @@ jobs:
             artifacts/linux-appimage/uuu-gui-linux.AppImage
             artifacts/linux-deb/uuu-gui-linux.deb
             artifacts/linux-rpm/uuu-gui-linux.rpm
+            artifacts/linux-arm64-appimage/uuu-gui-linux-arm64.AppImage
+            artifacts/linux-arm64-deb/uuu-gui-linux-arm64.deb
+            artifacts/linux-arm64-rpm/uuu-gui-linux-arm64.rpm
             artifacts/macos-dmg/uuu-gui-macos.dmg
             artifacts/windows-zip/uuu-gui-windows.zip
