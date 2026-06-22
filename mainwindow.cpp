@@ -61,7 +61,15 @@ public:
         QString name = index.data(Qt::DisplayRole).toString();
         QString desc = index.data(kPresetDescRole).toString();
 
-        bool selected = option.state & QStyle::State_Selected;
+        bool selected = opt.state & QStyle::State_Selected;
+        // Resolve the correct palette color group to match what the style drew for
+        // the background — Active vs Inactive differs significantly on Windows 11
+        // (unfocused selection is light/transparent, so HighlightedText=white would
+        // be invisible on a light background).
+        QPalette::ColorGroup group = !(opt.state & QStyle::State_Enabled) ? QPalette::Disabled
+                                   : (opt.state  & QStyle::State_Active)  ? QPalette::Active
+                                                                           : QPalette::Inactive;
+
         QRect r = option.rect.adjusted(10, 0, -6, 0);
 
         QFont nameFont = option.font;
@@ -69,10 +77,10 @@ public:
         QFont descFont = option.font;
         descFont.setPointSize(qMax(option.font.pointSize() - 3, 6));
 
-        QColor nameColor = option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
+        QColor nameColor = opt.palette.color(group, selected ? QPalette::HighlightedText : QPalette::Text);
         QColor descColor = selected
-            ? nameColor.lighter(160)
-            : option.palette.color(QPalette::PlaceholderText);
+            ? opt.palette.color(group, QPalette::HighlightedText)
+            : opt.palette.color(group, QPalette::PlaceholderText);
 
         QFontMetrics nameFm(nameFont);
         QFontMetrics descFm(descFont);
