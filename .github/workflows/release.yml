@@ -45,8 +45,9 @@ jobs:
             --output appimage
           mv UUU_Flash_Tool-x86_64.AppImage uuu-gui-linux.AppImage
 
-      - name: Build .deb
+      - name: Build .deb and .rpm
         run: |
+          sudo apt-get install -y alien
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
@@ -63,6 +64,8 @@ jobs:
           Description: NXP UUU firmware flashing GUI
           EOF
           dpkg-deb --build deb uuu-gui-linux.deb
+          sudo alien --to-rpm --scripts uuu-gui-linux.deb
+          mv *.rpm uuu-gui-linux.rpm
 
       - uses: actions/upload-artifact@v4
         with:
@@ -73,6 +76,11 @@ jobs:
         with:
           name: linux-deb
           path: uuu-gui-linux.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: uuu-gui-linux.rpm
 
   build-macos:
     runs-on: macos-latest
@@ -174,5 +182,6 @@ jobs:
           files: |
             artifacts/linux-appimage/uuu-gui-linux.AppImage
             artifacts/linux-deb/uuu-gui-linux.deb
+            artifacts/linux-rpm/uuu-gui-linux.rpm
             artifacts/macos-dmg/uuu-gui-macos.dmg
             artifacts/windows-zip/uuu-gui-windows.zip
