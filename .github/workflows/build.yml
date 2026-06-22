@@ -48,7 +48,7 @@ jobs:
             --icon-file UUUFlashTool.png
           for lib in libX11 libX11-xcb libxcb libxkbcommon libxkbcommon-x11 \
                      libxcb-icccm libxcb-image libxcb-keysyms1 libxcb-render-util libxcb-cursor \
-                     libXext libXrender; do
+                     libXext libXrender libOpenGL libEGL libGLdispatch; do
             find /usr/lib/x86_64-linux-gnu -name "${lib}.so*" -exec cp -Pn {} AppDir/usr/lib/ \; 2>/dev/null || true
           done
           ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir UUU_Flash_Tool-x86_64.AppImage
@@ -137,7 +137,7 @@ jobs:
             --icon-file UUUFlashTool.png
           for lib in libX11 libX11-xcb libxcb libxkbcommon libxkbcommon-x11 \
                      libxcb-icccm libxcb-image libxcb-keysyms1 libxcb-render-util libxcb-cursor \
-                     libXext libXrender; do
+                     libXext libXrender libOpenGL libEGL libGLdispatch; do
             find /usr/lib/aarch64-linux-gnu -name "${lib}.so*" -exec cp -Pn {} AppDir/usr/lib/ \; 2>/dev/null || true
           done
           ARCH=aarch64 ./appimagetool-aarch64.AppImage AppDir UUU_Flash_Tool-aarch64.AppImage
