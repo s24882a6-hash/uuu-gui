@@ -33,7 +33,8 @@ jobs:
           rsvg-convert -w 256 -h 256 icons/UUUFlashTool.svg -o UUUFlashTool.png
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage appimagetool-x86_64.AppImage
           export QMAKE=$(which qmake6 || which qmake)
           export EXTRA_QT_PLUGINS=platformthemes/libqgtk3.so:styles/libqgtk3.so
           ./linuxdeploy-x86_64.AppImage \
@@ -41,27 +42,41 @@ jobs:
             --plugin qt \
             --executable AppDir/usr/bin/uuu-helper \
             --desktop-file UUUFlashTool.desktop \
-            --icon-file UUUFlashTool.png \
-            --output appimage
-          mv UUU_Flash_Tool-x86_64.AppImage uuu-gui-linux.AppImage
+            --icon-file UUUFlashTool.png
+          for lib in libX11 libX11-xcb libxcb libxkbcommon libxkbcommon-x11 \
+                     libxcb-icccm libxcb-image libxcb-keysyms1 libxcb-render-util libxcb-cursor \
+                     libXext libXrender; do
+            find /usr/lib/x86_64-linux-gnu -name "${lib}.so*" -exec cp -Pn {} AppDir/usr/lib/ \; 2>/dev/null || true
+          done
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir uuu-gui-linux.AppImage
 
       - name: Build .deb and .rpm
         run: |
           sudo apt-get install -y alien
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
+          mkdir -p deb/DEBIAN \
+                   deb/opt/uuu-gui/bin \
+                   deb/opt/uuu-gui/lib \
+                   deb/opt/uuu-gui/plugins \
+                   deb/usr/local/bin \
+                   deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
-          cp AppDir/usr/bin/UUUFlashTool deb/usr/bin/
-          cp AppDir/usr/bin/uuu-helper    deb/usr/bin/
+          cp AppDir/usr/bin/UUUFlashTool deb/opt/uuu-gui/bin/
+          cp AppDir/usr/bin/uuu-helper    deb/opt/uuu-gui/bin/
+          cp -r AppDir/usr/lib/.          deb/opt/uuu-gui/lib/
+          [ -d AppDir/usr/plugins ] && cp -r AppDir/usr/plugins/. deb/opt/uuu-gui/plugins/
           cp UUUFlashTool.desktop deb/usr/share/applications/
           cp UUUFlashTool.png     deb/usr/share/icons/hicolor/256x256/apps/UUUFlashTool.png
+          printf '#!/bin/sh\nexport LD_LIBRARY_PATH=/opt/uuu-gui/lib:$LD_LIBRARY_PATH\nexport QT_PLUGIN_PATH=/opt/uuu-gui/plugins\nexec /opt/uuu-gui/bin/UUUFlashTool "$@"\n' \
+            > deb/usr/local/bin/UUUFlashTool
+          chmod +x deb/usr/local/bin/UUUFlashTool
           cat > deb/DEBIAN/control << EOF
           Package: uuu-gui
           Version: ${VERSION}
           Architecture: amd64
           Maintainer: uuu-gui
-          Depends: libqt6widgets6, libqt6svg6, libusb-1.0-0, libzstd1, libtinyxml2-9, libbz2-1.0, zlib1g, libssl3
-          Description: NXP UUU firmware flashing GUI
+          Depends: libusb-1.0-0, libgl1
+          Description: NXP UUU firmware flashing GUI (self-contained)
           EOF
           dpkg-deb --build deb uuu-gui-linux.deb
           sudo alien --to-rpm --scripts uuu-gui-linux.deb
@@ -109,7 +124,8 @@ jobs:
           rsvg-convert -w 256 -h 256 icons/UUUFlashTool.svg -o UUUFlashTool.png
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-aarch64.AppImage
-          chmod +x linuxdeploy-aarch64.AppImage linuxdeploy-plugin-qt-aarch64.AppImage
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
+          chmod +x linuxdeploy-aarch64.AppImage linuxdeploy-plugin-qt-aarch64.AppImage appimagetool-aarch64.AppImage
           export QMAKE=$(which qmake6 || which qmake)
           export EXTRA_QT_PLUGINS=platformthemes/libqgtk3.so:styles/libqgtk3.so
           ./linuxdeploy-aarch64.AppImage \
@@ -117,27 +133,41 @@ jobs:
             --plugin qt \
             --executable AppDir/usr/bin/uuu-helper \
             --desktop-file UUUFlashTool.desktop \
-            --icon-file UUUFlashTool.png \
-            --output appimage
-          mv UUU_Flash_Tool-aarch64.AppImage uuu-gui-linux-arm64.AppImage
+            --icon-file UUUFlashTool.png
+          for lib in libX11 libX11-xcb libxcb libxkbcommon libxkbcommon-x11 \
+                     libxcb-icccm libxcb-image libxcb-keysyms1 libxcb-render-util libxcb-cursor \
+                     libXext libXrender; do
+            find /usr/lib/aarch64-linux-gnu -name "${lib}.so*" -exec cp -Pn {} AppDir/usr/lib/ \; 2>/dev/null || true
+          done
+          ARCH=aarch64 ./appimagetool-aarch64.AppImage AppDir uuu-gui-linux-arm64.AppImage
 
       - name: Build .deb and .rpm
         run: |
           sudo apt-get install -y alien
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications \
+          mkdir -p deb/DEBIAN \
+                   deb/opt/uuu-gui/bin \
+                   deb/opt/uuu-gui/lib \
+                   deb/opt/uuu-gui/plugins \
+                   deb/usr/local/bin \
+                   deb/usr/share/applications \
                    deb/usr/share/icons/hicolor/256x256/apps
-          cp AppDir/usr/bin/UUUFlashTool deb/usr/bin/
-          cp AppDir/usr/bin/uuu-helper    deb/usr/bin/
+          cp AppDir/usr/bin/UUUFlashTool deb/opt/uuu-gui/bin/
+          cp AppDir/usr/bin/uuu-helper    deb/opt/uuu-gui/bin/
+          cp -r AppDir/usr/lib/.          deb/opt/uuu-gui/lib/
+          [ -d AppDir/usr/plugins ] && cp -r AppDir/usr/plugins/. deb/opt/uuu-gui/plugins/
           cp UUUFlashTool.desktop deb/usr/share/applications/
           cp UUUFlashTool.png     deb/usr/share/icons/hicolor/256x256/apps/UUUFlashTool.png
+          printf '#!/bin/sh\nexport LD_LIBRARY_PATH=/opt/uuu-gui/lib:$LD_LIBRARY_PATH\nexport QT_PLUGIN_PATH=/opt/uuu-gui/plugins\nexec /opt/uuu-gui/bin/UUUFlashTool "$@"\n' \
+            > deb/usr/local/bin/UUUFlashTool
+          chmod +x deb/usr/local/bin/UUUFlashTool
           cat > deb/DEBIAN/control << EOF
           Package: uuu-gui
           Version: ${VERSION}
           Architecture: arm64
           Maintainer: uuu-gui
-          Depends: libqt6widgets6, libqt6svg6, libusb-1.0-0, libzstd1, libtinyxml2-9, libbz2-1.0, zlib1g, libssl3
-          Description: NXP UUU firmware flashing GUI
+          Depends: libusb-1.0-0, libgl1
+          Description: NXP UUU firmware flashing GUI (self-contained)
           EOF
           dpkg-deb --build deb uuu-gui-linux-arm64.deb
           sudo alien --to-rpm --scripts uuu-gui-linux-arm64.deb
