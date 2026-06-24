@@ -1,10 +1,14 @@
-# uuu-gui
+<div align="center">
+  <img src="icons/UUUFlashTool.svg" width="96" height="96" alt="uuu-gui logo"/>
+  <h1>uuu-gui</h1>
+  <p>Кроссплатформенный графический интерфейс для <a href="https://github.com/nxp-imx/mfgtools">NXP UUU</a> (Universal Update Utility) — стандартного инструмента прошивки процессоров NXP i.MX по USB.</p>
+  <p>
+    <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Platforms"/>
+  </p>
+  <img src="icons/preview.png" alt="Скриншот uuu-gui" width="800"/>
+</div>
 
 > [English version](README.md)
-
-Кроссплатформенный графический интерфейс для [NXP UUU](https://github.com/nxp-imx/mfgtools) (Universal Update Utility) — стандартного инструмента прошивки процессоров NXP i.MX по USB.
-
-![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 
 ## Что это такое?
 
