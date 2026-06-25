@@ -16,6 +16,7 @@ public:
 
 signals:
     void languageChanged(const QString& lang);
+    void themeChanged(const QString& theme);
     void settingsSaved();
 
 protected:
@@ -30,10 +31,12 @@ private:
     void loadFromSettings();
     void retranslateUi();
 
-    QGroupBox*   m_generalGroup = nullptr;
-    QGroupBox*   m_logsGroup    = nullptr;
-    QLabel*      m_langLabel    = nullptr;
-    QComboBox*   m_langCombo   = nullptr;
+    QGroupBox*   m_generalGroup  = nullptr;
+    QGroupBox*   m_logsGroup     = nullptr;
+    QLabel*      m_langLabel     = nullptr;
+    QComboBox*   m_langCombo     = nullptr;
+    QLabel*      m_themeLabel    = nullptr;
+    QComboBox*   m_themeCombo    = nullptr;
     QCheckBox*   m_chkSaveLogs = nullptr;
     QLineEdit*   m_logDirEdit  = nullptr;
     QPushButton* m_logDirBrowse = nullptr;

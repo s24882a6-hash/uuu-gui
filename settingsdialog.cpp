@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QStyleHints>
 #include <QVBoxLayout>
 
 SettingsDialog::SettingsDialog(QWidget* parent)
@@ -38,6 +39,13 @@ void SettingsDialog::setupUi()
     m_langCombo->addItem("Русский", "ru");
     m_langLabel = new QLabel(tr("Language:"), otherGroup);
     otherLayout->addRow(m_langLabel, m_langCombo);
+
+    m_themeCombo = new QComboBox(otherGroup);
+    m_themeCombo->addItem(tr("System"),  "system");
+    m_themeCombo->addItem(tr("Light"),   "light");
+    m_themeCombo->addItem(tr("Dark"),    "dark");
+    m_themeLabel = new QLabel(tr("Appearance:"), otherGroup);
+    otherLayout->addRow(m_themeLabel, m_themeCombo);
 
     root->addWidget(otherGroup);
 
@@ -75,6 +83,10 @@ void SettingsDialog::setupUi()
         emit languageChanged(m_langCombo->currentData().toString());
         save();
     });
+    connect(m_themeCombo, &QComboBox::currentIndexChanged, this, [this]() {
+        emit themeChanged(m_themeCombo->currentData().toString());
+        save();
+    });
 }
 
 void SettingsDialog::loadFromSettings()
@@ -85,6 +97,7 @@ void SettingsDialog::loadFromSettings()
     QSignalBlocker b3(m_langCombo);
     QSignalBlocker b4(m_chkSaveLogs);
     QSignalBlocker b5(m_logDirEdit);
+    QSignalBlocker b6(m_themeCombo);
 
     QSettings s;
 
@@ -92,6 +105,11 @@ void SettingsDialog::loadFromSettings()
     QString savedLang = s.value("language", "en").toString();
     int lidx = m_langCombo->findData(savedLang);
     if (lidx >= 0) m_langCombo->setCurrentIndex(lidx);
+
+    // Restore theme
+    QString savedTheme = s.value("theme", "system").toString();
+    int tidx = m_themeCombo->findData(savedTheme);
+    if (tidx >= 0) m_themeCombo->setCurrentIndex(tidx);
 
     // Restore log settings
     m_chkSaveLogs->setChecked(s.value("saveLogs", false).toBool());
@@ -113,6 +131,10 @@ void SettingsDialog::retranslateUi()
     setWindowTitle(tr("Settings"));
     m_generalGroup->setTitle(tr("General"));
     m_langLabel->setText(tr("Language:"));
+    m_themeLabel->setText(tr("Appearance:"));
+    m_themeCombo->setItemText(0, tr("System"));
+    m_themeCombo->setItemText(1, tr("Light"));
+    m_themeCombo->setItemText(2, tr("Dark"));
     m_logsGroup->setTitle(tr("Flash Logs"));
     m_chkSaveLogs->setText(tr("Save logs to file"));
     m_logDirEdit->setPlaceholderText(tr("Log directory…"));
@@ -131,6 +153,7 @@ void SettingsDialog::save()
 {
     QSettings s;
     s.setValue("language",   m_langCombo->currentData().toString());
+    s.setValue("theme",      m_themeCombo->currentData().toString());
     s.setValue("saveLogs",   m_chkSaveLogs->isChecked());
     s.setValue("logDir",     m_logDirEdit->text().trimmed());
     emit settingsSaved();

@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QEvent>
+#include <QStyleHints>
 #include <QGroupBox>
 #include <QCloseEvent>
 #include <QComboBox>
@@ -180,6 +181,20 @@ void MainWindow::applyLanguage(const QString& lang)
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+void MainWindow::applyTheme(const QString& theme)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    if (theme == "light")
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Light);
+    else if (theme == "dark")
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+    else
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
+#else
+    Q_UNUSED(theme)
+#endif
+}
+
 void MainWindow::setupUi()
 {
     auto* central = new QWidget(this);
@@ -308,6 +323,7 @@ void MainWindow::openSettings()
 {
     SettingsDialog dlg(this);
     connect(&dlg, &SettingsDialog::languageChanged, this, &MainWindow::applyLanguage);
+    connect(&dlg, &SettingsDialog::themeChanged,   this, &MainWindow::applyTheme);
     connect(&dlg, &SettingsDialog::settingsSaved, this, [this]() {
         applySettings();
     });
