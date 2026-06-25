@@ -30,6 +30,21 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Svg)
 
+if(APPLE)
+    # AGL was removed from the macOS SDK in Xcode 26. Qt's CMake config may
+    # still list it as a transitive dependency of Qt6::Gui; strip it out so
+    # the linker never sees it (Qt does not use AGL on Apple Silicon).
+    foreach(_qt_target Qt6::Gui Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
+        if(TARGET ${_qt_target})
+            get_target_property(_libs ${_qt_target} INTERFACE_LINK_LIBRARIES)
+            if(_libs)
+                list(FILTER _libs EXCLUDE REGEX "AGL")
+                set_target_properties(${_qt_target} PROPERTIES INTERFACE_LINK_LIBRARIES "${_libs}")
+            endif()
+        endif()
+    endforeach()
+endif()
+
 # --- libusb ---
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
@@ -150,10 +165,6 @@ if(APPLE)
     find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
     find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
     target_link_libraries(UUUFlashTool PRIVATE ${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
-    # AGL was removed from the macOS SDK in Xcode 26. Qt's CMake config may
-    # still list it as a transitive dependency; make it weak so the linker
-    # does not fail when the framework is absent (unused on Apple Silicon).
-    target_link_options(UUUFlashTool PRIVATE "-weak_framework" "AGL")
 endif()
 
 # --- uuu-helper (libuuu-backed flash/list worker, spawned by the GUI) ---
