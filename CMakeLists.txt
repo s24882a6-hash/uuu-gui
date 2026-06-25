@@ -150,6 +150,10 @@ if(APPLE)
     find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
     find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
     target_link_libraries(UUUFlashTool PRIVATE ${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
+    # AGL was removed from the macOS SDK in Xcode 26. Qt's CMake config may
+    # still list it as a transitive dependency; make it weak so the linker
+    # does not fail when the framework is absent (unused on Apple Silicon).
+    target_link_options(UUUFlashTool PRIVATE "-weak_framework" "AGL")
 endif()
 
 # --- uuu-helper (libuuu-backed flash/list worker, spawned by the GUI) ---
