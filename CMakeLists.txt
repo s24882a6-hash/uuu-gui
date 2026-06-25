@@ -30,21 +30,6 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Svg)
 
-if(APPLE)
-    # AGL was removed from the macOS SDK in Xcode 26. Qt's CMake config may
-    # still list it as a transitive dependency of Qt6::Gui; strip it out so
-    # the linker never sees it (Qt does not use AGL on Apple Silicon).
-    foreach(_qt_target Qt6::Gui Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
-        if(TARGET ${_qt_target})
-            get_target_property(_libs ${_qt_target} INTERFACE_LINK_LIBRARIES)
-            if(_libs)
-                list(FILTER _libs EXCLUDE REGEX "AGL")
-                set_target_properties(${_qt_target} PROPERTIES INTERFACE_LINK_LIBRARIES "${_libs}")
-            endif()
-        endif()
-    endforeach()
-endif()
-
 # --- libusb ---
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
