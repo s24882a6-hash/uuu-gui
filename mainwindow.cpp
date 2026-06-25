@@ -185,7 +185,6 @@ void MainWindow::applyLanguage(const QString& lang)
 
 void MainWindow::applyTheme(const QString& theme)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 #ifdef Q_OS_LINUX
     // QTBUG-129917: on Linux/GNOME the platform plugin doesn't implement
     // requestColorScheme(), so setColorScheme() is silently ignored.
@@ -257,14 +256,13 @@ void MainWindow::applyTheme(const QString& theme)
         p.setColor(QPalette::Disabled, QPalette::Button,          window);
         QApplication::setPalette(p);
     }
-#else
+#elif QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     if (theme == "light")
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Light);
     else if (theme == "dark")
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Dark);
     else
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
-#endif
 #else
     Q_UNUSED(theme)
 #endif
