@@ -225,7 +225,11 @@ jobs:
           # -executable= makes macdeployqt also bundle/fix-up the uuu-helper's dylibs
           macdeployqt build/UUUFlashTool.app -executable=build/UUUFlashTool.app/Contents/MacOS/uuu-helper
           codesign --force --deep --sign - build/UUUFlashTool.app
-          hdiutil create -volname uuu-gui -srcfolder build/UUUFlashTool.app -ov -format UDZO uuu-gui-macos.dmg
+          # codesign/Spotlight can hold file handles briefly; retry to avoid "Resource busy"
+          for i in 1 2 3 4 5; do
+            hdiutil create -volname uuu-gui -srcfolder build/UUUFlashTool.app -ov -format UDZO uuu-gui-macos.dmg && break
+            sleep 5
+          done
 
       - uses: actions/upload-artifact@v4
         with:
