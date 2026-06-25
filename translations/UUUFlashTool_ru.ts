@@ -4,26 +4,26 @@
 <context>
     <name>DeviceItemWidget</name>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="36"/>
-        <location filename="../deviceitemwidget.cpp" line="274"/>
+        <location filename="../deviceitemwidget.cpp" line="35"/>
+        <location filename="../deviceitemwidget.cpp" line="273"/>
         <source>Idle</source>
         <translation>Ожидание</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="60"/>
-        <location filename="../deviceitemwidget.cpp" line="276"/>
+        <location filename="../deviceitemwidget.cpp" line="59"/>
+        <location filename="../deviceitemwidget.cpp" line="275"/>
         <source>Flash</source>
         <translation>Прошить</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="64"/>
-        <location filename="../deviceitemwidget.cpp" line="205"/>
+        <location filename="../deviceitemwidget.cpp" line="63"/>
+        <location filename="../deviceitemwidget.cpp" line="204"/>
         <source>Logs</source>
         <translation>Логи</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="129"/>
-        <location filename="../deviceitemwidget.cpp" line="274"/>
+        <location filename="../deviceitemwidget.cpp" line="128"/>
+        <location filename="../deviceitemwidget.cpp" line="273"/>
         <source>Flashing…</source>
         <translation>Прошивка…</translation>
     </message>
@@ -32,26 +32,26 @@
         <translation type="vanished">Перезагрузка…</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="248"/>
-        <location filename="../deviceitemwidget.cpp" line="252"/>
+        <location filename="../deviceitemwidget.cpp" line="247"/>
+        <location filename="../deviceitemwidget.cpp" line="251"/>
         <source>Done</source>
         <translation>Готово</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="187"/>
-        <location filename="../deviceitemwidget.cpp" line="191"/>
-        <location filename="../deviceitemwidget.cpp" line="254"/>
-        <location filename="../deviceitemwidget.cpp" line="258"/>
+        <location filename="../deviceitemwidget.cpp" line="186"/>
+        <location filename="../deviceitemwidget.cpp" line="190"/>
+        <location filename="../deviceitemwidget.cpp" line="253"/>
+        <location filename="../deviceitemwidget.cpp" line="257"/>
         <source>Error</source>
         <translation>Ошибка</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="168"/>
+        <location filename="../deviceitemwidget.cpp" line="167"/>
         <source>Retrying with administrator privileges…</source>
         <translation>Повтор с правами администратора…</translation>
     </message>
     <message>
-        <location filename="../deviceitemwidget.cpp" line="276"/>
+        <location filename="../deviceitemwidget.cpp" line="275"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
@@ -101,70 +101,70 @@ Retry with pkexec (a password dialog will appear)?</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../mainwindow.cpp" line="113"/>
-        <location filename="../mainwindow.cpp" line="153"/>
+        <location filename="../mainwindow.cpp" line="123"/>
+        <location filename="../mainwindow.cpp" line="163"/>
         <source>UUU Flash Tool</source>
         <translation>UUU Flash Tool</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="154"/>
-        <location filename="../mainwindow.cpp" line="200"/>
+        <location filename="../mainwindow.cpp" line="164"/>
+        <location filename="../mainwindow.cpp" line="297"/>
         <source>Firmware Presets</source>
         <translation>Пресеты прошивки</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="156"/>
-        <location filename="../mainwindow.cpp" line="210"/>
+        <location filename="../mainwindow.cpp" line="166"/>
+        <location filename="../mainwindow.cpp" line="307"/>
         <source>Add</source>
         <translation>Добавить</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="157"/>
-        <location filename="../mainwindow.cpp" line="211"/>
+        <location filename="../mainwindow.cpp" line="167"/>
+        <location filename="../mainwindow.cpp" line="308"/>
         <source>Edit</source>
         <translation>Изменить</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="158"/>
-        <location filename="../mainwindow.cpp" line="212"/>
+        <location filename="../mainwindow.cpp" line="168"/>
+        <location filename="../mainwindow.cpp" line="309"/>
         <source>Delete</source>
         <translation>Удалить</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="155"/>
-        <location filename="../mainwindow.cpp" line="236"/>
+        <location filename="../mainwindow.cpp" line="165"/>
+        <location filename="../mainwindow.cpp" line="333"/>
         <source>Connected Devices</source>
         <translation>Подключённые устройства</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="159"/>
-        <location filename="../mainwindow.cpp" line="246"/>
+        <location filename="../mainwindow.cpp" line="169"/>
+        <location filename="../mainwindow.cpp" line="343"/>
         <source>No NXP devices detected.
 Connect a device in recovery / SDP mode.</source>
         <translation>Устройства NXP не обнаружены.
 Подключите устройство в режиме recovery / SDP.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="160"/>
-        <location filename="../mainwindow.cpp" line="266"/>
+        <location filename="../mainwindow.cpp" line="170"/>
+        <location filename="../mainwindow.cpp" line="363"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="161"/>
-        <location filename="../mainwindow.cpp" line="272"/>
+        <location filename="../mainwindow.cpp" line="171"/>
+        <location filename="../mainwindow.cpp" line="369"/>
         <source>Auto-flash on connect:</source>
         <translation>Авто-прошивка при подключении:</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="162"/>
-        <location filename="../mainwindow.cpp" line="282"/>
+        <location filename="../mainwindow.cpp" line="172"/>
+        <location filename="../mainwindow.cpp" line="379"/>
         <source>Reboot after flash</source>
         <translation>Перезагрузить после прошивки</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="163"/>
-        <location filename="../mainwindow.cpp" line="287"/>
+        <location filename="../mainwindow.cpp" line="173"/>
+        <location filename="../mainwindow.cpp" line="384"/>
         <source>Flash Checked Devices</source>
         <translation>Прошить выбранные</translation>
     </message>
@@ -181,71 +181,71 @@ Connect a device in recovery / SDP mode.</source>
         <translation type="vanished">Файл uuu не найден по пути: </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="314"/>
+        <location filename="../mainwindow.cpp" line="412"/>
         <source>Built-in uuu-helper not found — limited functionality.</source>
         <translation>Встроенный uuu-helper не найден — ограниченная функциональность.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="318"/>
+        <location filename="../mainwindow.cpp" line="416"/>
         <source>Using built-in libuuu engine</source>
         <translation>Используется встроенный движок libuuu</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="404"/>
+        <location filename="../mainwindow.cpp" line="502"/>
         <source>Delete preset</source>
         <translation>Удалить пресет</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="405"/>
+        <location filename="../mainwindow.cpp" line="503"/>
         <source>Delete preset &quot;%1&quot;?</source>
         <translation>Удалить пресет «%1»?</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="444"/>
+        <location filename="../mainwindow.cpp" line="542"/>
         <source>No preset selected</source>
         <translation>Пресет не выбран</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="445"/>
+        <location filename="../mainwindow.cpp" line="543"/>
         <source>Select a firmware preset from the list before flashing.</source>
         <translation>Выберите пресет прошивки из списка перед прошивкой.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="472"/>
+        <location filename="../mainwindow.cpp" line="570"/>
         <source>Device connected: %1</source>
         <translation>Устройство подключено: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="495"/>
+        <location filename="../mainwindow.cpp" line="593"/>
         <source>Device rebooting: %1</source>
         <translation>Устройство перезагружается: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="500"/>
+        <location filename="../mainwindow.cpp" line="598"/>
         <source>Device disconnected: %1</source>
         <translation>Устройство отключено: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="510"/>
+        <location filename="../mainwindow.cpp" line="608"/>
         <source>USB monitoring unavailable.
 %1</source>
         <translation>Мониторинг USB недоступен.
 %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="512"/>
+        <location filename="../mainwindow.cpp" line="610"/>
         <source>USB monitoring unavailable — install libusb and rebuild.</source>
         <translation>Мониторинг USB недоступен — установите libusb и пересоберите.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="521"/>
-        <location filename="../mainwindow.cpp" line="591"/>
+        <location filename="../mainwindow.cpp" line="619"/>
+        <location filename="../mainwindow.cpp" line="719"/>
         <source>Helper not found</source>
         <translation>Helper не найден</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="522"/>
-        <location filename="../mainwindow.cpp" line="592"/>
+        <location filename="../mainwindow.cpp" line="620"/>
+        <location filename="../mainwindow.cpp" line="720"/>
         <source>The bundled uuu-helper executable is missing.</source>
         <translation>Встроенный исполняемый файл uuu-helper отсутствует.</translation>
     </message>
@@ -258,63 +258,62 @@ Connect a device in recovery / SDP mode.</source>
         <translation type="vanished">Сначала укажите корректный путь к uuu.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="527"/>
+        <location filename="../mainwindow.cpp" line="625"/>
         <source>Invalid preset</source>
         <translation>Некорректный пресет</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="528"/>
+        <location filename="../mainwindow.cpp" line="626"/>
         <source>The selected preset has missing or invalid files.</source>
         <translation>В выбранном пресете отсутствуют или некорректны файлы.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="543"/>
+        <location filename="../mainwindow.cpp" line="641"/>
         <source>Incorrect password — please try again.</source>
         <translation>Неверный пароль — попробуйте ещё раз.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="544"/>
+        <location filename="../mainwindow.cpp" line="642"/>
         <source>Enter your password to flash with administrator privileges.</source>
         <translation>Введите пароль для прошивки с правами администратора.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="545"/>
+        <location filename="../mainwindow.cpp" line="643"/>
         <source>Administrator password</source>
         <translation>Пароль администратора</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="556"/>
+        <location filename="../mainwindow.cpp" line="654"/>
         <source>Cannot access the device. Install the WinUSB driver (e.g. via Zadig).</source>
         <translation>Нет доступа к устройству. Установите драйвер WinUSB (например, через Zadig).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="560"/>
+        <location filename="../mainwindow.cpp" line="658"/>
         <source>Device access denied even with administrator privileges.</source>
         <translation>Доступ к устройству запрещён даже с правами администратора.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="564"/>
-        <location filename="../mainwindow.cpp" line="575"/>
+        <location filename="../mainwindow.cpp" line="697"/>
         <source>Administrator password is required to flash this device.</source>
         <translation>Для прошивки этого устройства нужен пароль администратора.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="585"/>
+        <location filename="../mainwindow.cpp" line="713"/>
         <source>No preset</source>
         <translation>Нет пресета</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="586"/>
+        <location filename="../mainwindow.cpp" line="714"/>
         <source>Select a firmware preset first.</source>
         <translation>Сначала выберите пресет прошивки.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="607"/>
+        <location filename="../mainwindow.cpp" line="735"/>
         <source>Nothing to flash</source>
         <translation>Нечего прошивать</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="608"/>
+        <location filename="../mainwindow.cpp" line="736"/>
         <source>Check at least one device in the list.</source>
         <translation>Отметьте хотя бы одно устройство в списке.</translation>
     </message>
@@ -380,12 +379,12 @@ Connect a device in recovery / SDP mode.</source>
     </message>
     <message>
         <location filename="../presetdialog.cpp" line="73"/>
-        <location filename="../presetdialog.cpp" line="165"/>
+        <location filename="../presetdialog.cpp" line="164"/>
         <source>Boot file (.bin / .imx):</source>
         <translation>Файл загрузчика (.bin / .imx):</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="164"/>
+        <location filename="../presetdialog.cpp" line="163"/>
         <source>Bootloader (.bin / .imx):</source>
         <translation>Загрузчик (.bin / .imx):</translation>
     </message>
@@ -407,35 +406,34 @@ Increase to 5–10 if device doesn&apos;t re-enumerate in time.</source>
 Увеличьте до 5–10, если устройство не успевает переподключиться.</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="119"/>
+        <location filename="../presetdialog.cpp" line="118"/>
         <source>Select 4G init file</source>
         <translation>Выбрать файл инициализации 4G</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="118"/>
         <source>Binary files (*.bin *.imx);;All files (*)</source>
-        <translation>Бинарные файлы (*.bin *.imx);;Все файлы (*)</translation>
+        <translation type="vanished">Бинарные файлы (*.bin *.imx);;Все файлы (*)</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="120"/>
+        <location filename="../presetdialog.cpp" line="119"/>
         <source>Select boot file</source>
         <translation>Выбрать файл загрузчика</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="121"/>
+        <location filename="../presetdialog.cpp" line="120"/>
         <source>Select image file</source>
         <translation>Выбрать образ системы</translation>
     </message>
     <message>
-        <location filename="../presetdialog.cpp" line="121"/>
         <source>WIC images (*.wic *.img);;All files (*)</source>
-        <translation>Образы WIC (*.wic *.img);;Все файлы (*)</translation>
+        <translation type="vanished">Образы WIC (*.wic *.img);;Все файлы (*)</translation>
     </message>
 </context>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../settingsdialog.cpp" line="19"/>
+        <location filename="../settingsdialog.cpp" line="21"/>
+        <location filename="../settingsdialog.cpp" line="131"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
@@ -444,12 +442,14 @@ Increase to 5–10 if device doesn&apos;t re-enumerate in time.</source>
         <translation type="vanished">Бинарный файл UUU</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="51"/>
+        <location filename="../settingsdialog.cpp" line="63"/>
+        <location filename="../settingsdialog.cpp" line="141"/>
         <source>Browse…</source>
         <translation>Обзор…</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="31"/>
+        <location filename="../settingsdialog.cpp" line="33"/>
+        <location filename="../settingsdialog.cpp" line="132"/>
         <source>General</source>
         <translation>Основные</translation>
     </message>
@@ -462,7 +462,8 @@ Increase to 5–10 if device doesn&apos;t re-enumerate in time.</source>
         <translation type="vanished">Без прав</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="37"/>
+        <location filename="../settingsdialog.cpp" line="40"/>
+        <location filename="../settingsdialog.cpp" line="133"/>
         <source>Language:</source>
         <translation>Язык:</translation>
     </message>
@@ -479,22 +480,49 @@ Increase to 5–10 if device doesn&apos;t re-enumerate in time.</source>
         <translation type="vanished">Все файлы (*)</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="42"/>
+        <location filename="../settingsdialog.cpp" line="44"/>
+        <location filename="../settingsdialog.cpp" line="135"/>
+        <source>System</source>
+        <translation>Системная</translation>
+    </message>
+    <message>
+        <location filename="../settingsdialog.cpp" line="45"/>
+        <location filename="../settingsdialog.cpp" line="136"/>
+        <source>Light</source>
+        <translation>Светлая</translation>
+    </message>
+    <message>
+        <location filename="../settingsdialog.cpp" line="46"/>
+        <location filename="../settingsdialog.cpp" line="137"/>
+        <source>Dark</source>
+        <translation>Тёмная</translation>
+    </message>
+    <message>
+        <location filename="../settingsdialog.cpp" line="47"/>
+        <location filename="../settingsdialog.cpp" line="134"/>
+        <source>Appearance:</source>
+        <translation>Оформление:</translation>
+    </message>
+    <message>
+        <location filename="../settingsdialog.cpp" line="53"/>
+        <location filename="../settingsdialog.cpp" line="138"/>
         <source>Flash Logs</source>
         <translation>Логи прошивки</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="45"/>
+        <location filename="../settingsdialog.cpp" line="57"/>
+        <location filename="../settingsdialog.cpp" line="139"/>
         <source>Save logs to file</source>
         <translation>Сохранять логи в файл</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="50"/>
+        <location filename="../settingsdialog.cpp" line="62"/>
+        <location filename="../settingsdialog.cpp" line="140"/>
         <source>Log directory…</source>
         <translation>Папка для логов…</translation>
     </message>
     <message>
-        <location filename="../settingsdialog.cpp" line="102"/>
+        <location filename="../settingsdialog.cpp" line="146"/>
         <source>Select log directory</source>
         <translation>Выбрать папку для логов</translation>
     </message>

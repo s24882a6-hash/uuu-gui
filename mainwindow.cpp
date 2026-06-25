@@ -6,6 +6,8 @@
 
 #include <QApplication>
 #include <QEvent>
+#include <QStyle>
+#include <QStyleFactory>
 #include <QStyleHints>
 #include <QGroupBox>
 #include <QCloseEvent>
@@ -184,12 +186,85 @@ void MainWindow::applyLanguage(const QString& lang)
 void MainWindow::applyTheme(const QString& theme)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#ifdef Q_OS_LINUX
+    // QTBUG-129917: on Linux/GNOME the platform plugin doesn't implement
+    // requestColorScheme(), so setColorScheme() is silently ignored.
+    // Workaround: switch to Fusion (always available, no platform-theme
+    // interference) and set the palette explicitly.
+    static const QString defaultStyle   = QApplication::style()->name();
+    static const QPalette defaultPalette = QApplication::palette();
+
+    if (theme == "system") {
+        QApplication::setStyle(defaultStyle);
+        QApplication::setPalette(defaultPalette);
+        return;
+    }
+
+    QApplication::setStyle("Fusion");
+
+    if (theme == "dark") {
+        QPalette p;
+        const QColor base(35, 35, 35);
+        const QColor window(53, 53, 53);
+        const QColor text(Qt::white);
+        const QColor disabled(127, 127, 127);
+        const QColor highlight(42, 130, 218);
+        p.setColor(QPalette::Window,          window);
+        p.setColor(QPalette::WindowText,      text);
+        p.setColor(QPalette::Base,            base);
+        p.setColor(QPalette::AlternateBase,   window);
+        p.setColor(QPalette::ToolTipBase,     QColor(25, 25, 25));
+        p.setColor(QPalette::ToolTipText,     text);
+        p.setColor(QPalette::Text,            text);
+        p.setColor(QPalette::Button,          window);
+        p.setColor(QPalette::ButtonText,      text);
+        p.setColor(QPalette::BrightText,      Qt::red);
+        p.setColor(QPalette::Link,            highlight);
+        p.setColor(QPalette::Highlight,       highlight);
+        p.setColor(QPalette::HighlightedText, Qt::black);
+        p.setColor(QPalette::Disabled, QPalette::WindowText,      disabled);
+        p.setColor(QPalette::Disabled, QPalette::Text,            disabled);
+        p.setColor(QPalette::Disabled, QPalette::ButtonText,      disabled);
+        p.setColor(QPalette::Disabled, QPalette::HighlightedText, disabled);
+        p.setColor(QPalette::Disabled, QPalette::Base,            window);
+        p.setColor(QPalette::Disabled, QPalette::Button,          window);
+        QApplication::setPalette(p);
+    } else {
+        QPalette p;
+        const QColor window(239, 239, 239);
+        const QColor base(Qt::white);
+        const QColor text(Qt::black);
+        const QColor disabled(160, 160, 160);
+        const QColor highlight(48, 140, 198);
+        p.setColor(QPalette::Window,          window);
+        p.setColor(QPalette::WindowText,      text);
+        p.setColor(QPalette::Base,            base);
+        p.setColor(QPalette::AlternateBase,   QColor(247, 247, 247));
+        p.setColor(QPalette::ToolTipBase,     QColor(255, 255, 220));
+        p.setColor(QPalette::ToolTipText,     text);
+        p.setColor(QPalette::Text,            text);
+        p.setColor(QPalette::Button,          window);
+        p.setColor(QPalette::ButtonText,      text);
+        p.setColor(QPalette::BrightText,      Qt::red);
+        p.setColor(QPalette::Link,            QColor(0, 0, 255));
+        p.setColor(QPalette::Highlight,       highlight);
+        p.setColor(QPalette::HighlightedText, Qt::white);
+        p.setColor(QPalette::Disabled, QPalette::WindowText,      disabled);
+        p.setColor(QPalette::Disabled, QPalette::Text,            disabled);
+        p.setColor(QPalette::Disabled, QPalette::ButtonText,      disabled);
+        p.setColor(QPalette::Disabled, QPalette::HighlightedText, disabled);
+        p.setColor(QPalette::Disabled, QPalette::Base,            window);
+        p.setColor(QPalette::Disabled, QPalette::Button,          window);
+        QApplication::setPalette(p);
+    }
+#else
     if (theme == "light")
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Light);
     else if (theme == "dark")
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Dark);
     else
         qApp->styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
+#endif
 #else
     Q_UNUSED(theme)
 #endif

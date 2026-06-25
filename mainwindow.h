@@ -22,6 +22,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
+    static void applyTheme(const QString& theme);
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -69,7 +70,6 @@ private:
     void refreshPresetList();
     void retranslateUi();
     void applyLanguage(const QString& lang);
-    void applyTheme(const QString& theme);
     void applySettings();
     FirmwarePreset* selectedPreset();
     void addDeviceWidget(const UsbDevice& dev);

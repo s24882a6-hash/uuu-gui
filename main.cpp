@@ -3,7 +3,6 @@
 #include <QIcon>
 #include <QLocale>
 #include <QSettings>
-#include <QStyleHints>
 
 int main(int argc, char* argv[])
 {
@@ -22,17 +21,7 @@ int main(int argc, char* argv[])
 #endif
 
     // Apply saved color scheme before any window is created.
-    {
-        QSettings s;
-        QString theme = s.value("theme", "system").toString();
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        if (theme == "light")
-            app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
-        else if (theme == "dark")
-            app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-        // "system" → leave at Qt::ColorScheme::Unknown (default)
-#endif
-    }
+    MainWindow::applyTheme(QSettings().value("theme", "system").toString());
 
     // Set default language on first run (detect system locale)
     {
