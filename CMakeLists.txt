@@ -56,46 +56,8 @@ if(NOT LIBUSB_FOUND)
 endif()
 
 # --- libuuu (built from source, drives the uuu-helper worker) ---
-# On Windows we also fetch libusb v1.0.29 pre-built DLLs directly from the
-# libusb git repo (same version NXP uses in mfgtools). We fetch it separately
-# rather than as a mfgtools submodule because GIT_SHALLOW + GIT_SUBMODULES is
-# unreliable in CI and the submodule ends up empty.
 
 include(FetchContent)
-
-if(WIN32)
-    # Download the official libusb 1.0.29 Windows release archive.
-    # The 7z extracts flat (no top-level dir): include/libusb-1.0/libusb.h,
-    # VS2022/MS64/dll/libusb-1.0.{dll,lib}, etc.
-    FetchContent_Declare(libusb_win
-        URL      https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.7z
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
-    FetchContent_GetProperties(libusb_win)
-    if(NOT libusb_win_POPULATED)
-        cmake_policy(PUSH)
-        cmake_policy(SET CMP0169 OLD)
-        FetchContent_Populate(libusb_win)
-        cmake_policy(POP)
-    endif()
-
-    set(LIBUSB_INCLUDE_DIRS "${libusb_win_SOURCE_DIR}/include/libusb-1.0")
-    set(_libusb_dll_dir     "${libusb_win_SOURCE_DIR}/VS2022/MS64/dll")
-
-    if(NOT EXISTS "${_libusb_dll_dir}/libusb-1.0.lib")
-        message(FATAL_ERROR
-            "Expected libusb DLLs not found at ${_libusb_dll_dir}. "
-            "Archive structure may have changed.")
-    endif()
-    message(STATUS "libusb pre-built DLLs: ${_libusb_dll_dir}")
-
-    add_library(libusb_bundled SHARED IMPORTED GLOBAL)
-    set_target_properties(libusb_bundled PROPERTIES
-        IMPORTED_IMPLIB   "${_libusb_dll_dir}/libusb-1.0.lib"
-        IMPORTED_LOCATION "${_libusb_dll_dir}/libusb-1.0.dll"
-        INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INCLUDE_DIRS}"
-    )
-endif()
 
 FetchContent_Declare(mfgtools
     GIT_REPOSITORY    https://github.com/nxp-imx/mfgtools.git
@@ -116,8 +78,6 @@ if(NOT mfgtools_POPULATED)
     cmake_policy(POP)
 endif()
 
-# Process libuuu — LIBUSB_INCLUDE_DIRS is now visible in this scope so the
-# patched guard skips pkg_check_modules on Windows.
 add_subdirectory("${mfgtools_SOURCE_DIR}/libuuu" "${mfgtools_BINARY_DIR}")
 
 # --- Sources ---
@@ -189,9 +149,6 @@ target_link_libraries(UUUFlashTool PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 if(LIBUSB_FOUND)
     target_link_libraries(UUUFlashTool PRIVATE PkgConfig::LIBUSB)
     target_compile_definitions(UUUFlashTool PRIVATE HAVE_LIBUSB)
-elseif(WIN32 AND TARGET libusb_bundled)
-    target_link_libraries(UUUFlashTool PRIVATE libusb_bundled)
-    target_compile_definitions(UUUFlashTool PRIVATE HAVE_LIBUSB)
 endif()
 
 if(WIN32)
@@ -211,11 +168,9 @@ find_package(BZip2 REQUIRED)
 find_package(ZLIB  REQUIRED)
 find_package(OpenSSL)
 if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBZSTD  REQUIRED IMPORTED_TARGET libzstd)
-    pkg_check_modules(TINYXML2 REQUIRED IMPORTED_TARGET tinyxml2)
-    if(NOT WIN32)
-        pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
-    endif()
+    pkg_check_modules(LIBZSTD     REQUIRED IMPORTED_TARGET libzstd)
+    pkg_check_modules(TINYXML2    REQUIRED IMPORTED_TARGET tinyxml2)
+    pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 endif()
 
 add_executable(uuu-helper helper/uuuhelper.cpp)
@@ -224,20 +179,10 @@ target_link_libraries(uuu-helper PRIVATE
     uuc_s
     PkgConfig::LIBZSTD
     PkgConfig::TINYXML2
+    PkgConfig::HELPER_LIBUSB
     BZip2::BZip2
     ZLIB::ZLIB
 )
-if(WIN32)
-    target_link_libraries(uuu-helper PRIVATE libusb_bundled)
-    # Copy bundled libusb-1.0.dll alongside the helper at build time
-    add_custom_command(TARGET uuu-helper POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${_libusb_dll_dir}/libusb-1.0.dll"
-            $<TARGET_FILE_DIR:uuu-helper>
-        COMMENT "Copying bundled libusb-1.0.dll")
-else()
-    target_link_libraries(uuu-helper PRIVATE PkgConfig::HELPER_LIBUSB)
-endif()
 if(OPENSSL_FOUND)
     target_link_libraries(uuu-helper PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
