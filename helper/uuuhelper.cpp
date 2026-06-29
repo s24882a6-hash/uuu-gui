@@ -87,9 +87,8 @@ static void emit(const std::string& line)
     // spawned by a GUI (WIN32-subsystem) parent on Windows (the inherited pipe
     // handle is valid but Qt never reads from it). stderr is confirmed to work.
     // The GUI splits stderr lines by prefix: '{' = JSON event, '[' = diagnostic.
-    std::lock_guard<std::mutex> lk(g_out_mtx);
-    std::fputs(line.c_str(), stderr);
-    std::fputc('\n', stderr);
+    // No mutex: list mode is single-threaded; mutex would deadlock on re-entry.
+    std::fprintf(stderr, "%s\n", line.c_str());
     std::fflush(stderr);
 }
 
@@ -186,6 +185,7 @@ static int list_cb(const char* path, const char* chip, const char* pro,
                    uint16_t vid, uint16_t pid, uint16_t bcd,
                    const char* serial, void*)
 {
+    dbg("list_cb: enter path=%s", path ? path : "(null)");
     std::string s = "{\"event\":\"device\"";
     s += ",\"path\":\""   + json_escape(path)   + "\"";
     s += ",\"chip\":\""   + json_escape(chip)   + "\"";
@@ -194,7 +194,9 @@ static int list_cb(const char* path, const char* chip, const char* pro,
     s += ",\"pid\":"      + std::to_string(pid);
     s += ",\"bcd\":"      + std::to_string(bcd);
     s += ",\"serial\":\"" + json_escape(serial) + "\"}";
+    dbg("list_cb: emitting %zu bytes", s.size());
     emit(s);
+    dbg("list_cb: emit done");
     return 0;
 }
 
