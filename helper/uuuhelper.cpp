@@ -359,6 +359,7 @@ static int finish(int rc, bool bestEffort)
 
 static int run_phase(const std::vector<std::string>& args)
 {
+    dbg("run_phase: start, %zu args", args.size());
     std::string serial, path, boot, bootloader, wic, cmd;
     bool haveBoot = false, haveEmmc = false, haveCmd = false, bestEffort = false;
 
@@ -379,18 +380,33 @@ static int run_phase(const std::vector<std::string>& args)
         else if (a == "--besteffort") bestEffort = true;
     }
 
+    dbg("run_phase: parsed: serial='%s' boot='%s' haveBoot=%d haveEmmc=%d haveCmd=%d",
+        serial.c_str(), boot.c_str(), haveBoot, haveEmmc, haveCmd);
+
     // Target a single device. Prefer serial — it survives USB re-enumeration
     // between SDP and fastboot, so libuuu re-finds the board on its own.
-    if (!serial.empty())     uuu_add_usbserial_no_filter(serial.c_str());
-    else if (!path.empty())  uuu_add_usbpath_filter(path.c_str());
+    if (!serial.empty()) {
+        dbg("run_phase: uuu_add_usbserial_no_filter(%s)", serial.c_str());
+        uuu_add_usbserial_no_filter(serial.c_str());
+        dbg("run_phase: filter set");
+    } else if (!path.empty()) {
+        dbg("run_phase: uuu_add_usbpath_filter(%s)", path.c_str());
+        uuu_add_usbpath_filter(path.c_str());
+        dbg("run_phase: filter set");
+    }
 
+    dbg("run_phase: registering notify_cb");
     uuu_register_notify_callback(notify_cb, nullptr);
+    dbg("run_phase: emitting phase_start");
     emit("{\"event\":\"phase_start\"}");
 
     int rc = 0;
     if (haveBoot) {
+        dbg("run_phase: uuu_auto_detect_file(%s)", boot.c_str());
         rc = uuu_auto_detect_file(boot.c_str());
+        dbg("run_phase: uuu_auto_detect_file returned %d", rc);
         if (rc == 0) rc = uuu_wait_uuu_finish(0, 0);
+        dbg("run_phase: uuu_wait_uuu_finish returned %d", rc);
     } else if (haveEmmc) {
         std::string script = substitute_tokens(kEmmcAllTemplate, bootloader, wic);
         rc = uuu_run_cmd_script(script.c_str(), 0);
