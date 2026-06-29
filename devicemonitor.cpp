@@ -3,6 +3,10 @@
 #include <QProcess>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QFile>
+#include <QTextStream>
 
 #ifdef HAVE_LIBUSB
 #  include <libusb.h>
@@ -93,6 +97,16 @@ QList<UsbDevice> DeviceMonitorThread::parseHelperList(const QByteArray& output)
     return devices;
 }
 
+static void appendHelperLog(const QString& text)
+{
+    QString logPath = QCoreApplication::applicationDirPath() + "/uuu-helper-debug.log";
+    QFile f(logPath);
+    if (!f.open(QIODevice::Append | QIODevice::Text))
+        return;
+    QTextStream out(&f);
+    out << "[" << QDateTime::currentDateTime().toString(Qt::ISODate) << "] " << text << "\n";
+}
+
 QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
 {
     QString helperPath;
@@ -104,18 +118,37 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
     if (helperPath.isEmpty()) return {};
 
     QProcess proc;
-    // Always list without elevation — enumerating devices doesn't need root, and
-    // sudo without a terminal would block waiting for a password.
     proc.setProgram(helperPath);
     proc.setArguments({"list"});
     proc.start();
-    if (!proc.waitForFinished(3000)) {
+
+    const bool finished = proc.waitForFinished(3000);
+
+    const QByteArray errBytes = proc.readAllStandardError();
+    if (!errBytes.isEmpty()) {
+        QString errText = QString::fromLocal8Bit(errBytes).trimmed();
+        appendHelperLog(errText);
+        emit helperDiagnostic(errText);
+    }
+
+    if (!finished) {
+        QString msg = QString("uuu-helper timed out or failed to start (state=%1 error=%2)")
+                          .arg(proc.state()).arg(proc.errorString());
+        appendHelperLog(msg);
+        emit helperDiagnostic(msg);
         proc.kill();
         return {};
     }
 
     QMap<QString, UsbDevice> result;
     const QByteArray output = proc.readAllStandardOutput();
+
+    if (!output.isEmpty()) {
+        appendHelperLog("stdout: " + QString::fromUtf8(output).trimmed());
+    } else {
+        appendHelperLog("stdout: (empty)");
+    }
+
     for (const UsbDevice& dev : parseHelperList(output))
         result[dev.busId] = dev;
     return result;
@@ -245,6 +278,8 @@ DeviceMonitor::DeviceMonitor(QObject* parent)
             this,     &DeviceMonitor::deviceDisconnected);
     connect(m_thread, &DeviceMonitorThread::monitoringUnavailable,
             this,     &DeviceMonitor::monitoringUnavailable);
+    connect(m_thread, &DeviceMonitorThread::helperDiagnostic,
+            this,     &DeviceMonitor::helperDiagnostic);
 }
 
 DeviceMonitor::~DeviceMonitor()

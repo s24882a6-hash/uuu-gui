@@ -25,4 +25,13 @@ string(REPLACE
   "COMMAND \${CMAKE_COMMAND} -E copy \${CMAKE_CURRENT_SOURCE_DIR}/gitversion_static.h \${gitversion_h}"
   t "${t}")
 
+# On Windows we supply libusb from the bundled submodule (same version as the
+# official NXP uuu binary). Skip pkg_check_modules when the parent has already
+# set LIBUSB_INCLUDE_DIRS so that the include_directories() call below still
+# picks up the right path without requiring a system libusb pkg-config entry.
+string(REPLACE
+  "pkg_check_modules(LIBUSB REQUIRED libusb-1.0>=1.0.16)"
+  "if(NOT LIBUSB_INCLUDE_DIRS)\n  pkg_check_modules(LIBUSB REQUIRED libusb-1.0>=1.0.16)\nendif()"
+  t "${t}")
+
 file(WRITE "${cml}" "${t}")

@@ -21,12 +21,28 @@
 
 #include "libuuu.h"
 
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <string>
 #include <vector>
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Diagnostic logging to stderr (never touches the JSON stdout protocol)
+// ──────────────────────────────────────────────────────────────────────────────
+
+static void dbg(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    std::fprintf(stderr, "[uuu-helper] ");
+    std::vfprintf(stderr, fmt, ap);
+    std::fprintf(stderr, "\n");
+    std::fflush(stderr);
+    va_end(ap);
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // JSON output
@@ -171,10 +187,41 @@ static int list_cb(const char* path, const char* chip, const char* pro,
     return 0;
 }
 
+struct ListCtx { int count = 0; };
+
+static int list_cb_debug(const char* path, const char* chip, const char* pro,
+                         uint16_t vid, uint16_t pid, uint16_t bcd,
+                         const char* serial, void* ctx)
+{
+    auto* lctx = static_cast<ListCtx*>(ctx);
+    lctx->count++;
+    dbg("  NXP device #%d: path=%s chip=%s pro=%s vid=0x%04x pid=0x%04x bcd=0x%04x serial=%s",
+        lctx->count,
+        path   ? path   : "(null)",
+        chip   ? chip   : "(null)",
+        pro    ? pro    : "(null)",
+        (unsigned)vid, (unsigned)pid, (unsigned)bcd,
+        serial ? serial : "(null)");
+    return list_cb(path, chip, pro, vid, pid, bcd, serial, nullptr);
+}
+
 static int run_list()
 {
-    uuu_for_each_devices(list_cb, nullptr);
+    dbg("--- list mode start ---");
+    dbg("libuuu version: %s", uuu_get_version_string());
+
+    ListCtx ctx;
+    dbg("calling uuu_for_each_devices...");
+    int rc = uuu_for_each_devices(list_cb_debug, &ctx);
+    dbg("uuu_for_each_devices returned %d, NXP devices found: %d", rc, ctx.count);
+
+    if (rc < 0) {
+        const char* err = uuu_get_last_err_string();
+        dbg("error: %s", err && *err ? err : "(no error string)");
+    }
+
     emit("{\"event\":\"list_end\"}");
+    dbg("--- list mode end ---");
     return 0;
 }
 
@@ -352,6 +399,10 @@ static int run_phase(const std::vector<std::string>& args)
 
 int main(int argc, char** argv)
 {
+    dbg("started, argc=%d", argc);
+    for (int i = 0; i < argc; i++)
+        dbg("  argv[%d] = %s", i, argv[i] ? argv[i] : "(null)");
+
     if (argc < 2) {
         std::fprintf(stderr, "usage: uuu-helper list | phase <opts>\n");
         return 64;
@@ -360,9 +411,13 @@ int main(int argc, char** argv)
     std::string mode = argv[1];
     std::vector<std::string> rest(argv + 2, argv + argc);
 
-    if (mode == "list")  return run_list();
-    if (mode == "phase") return run_phase(rest);
+    dbg("mode: %s", mode.c_str());
 
-    std::fprintf(stderr, "unknown mode: %s\n", mode.c_str());
-    return 64;
+    int rc = 64;
+    if (mode == "list")       rc = run_list();
+    else if (mode == "phase") rc = run_phase(rest);
+    else std::fprintf(stderr, "unknown mode: %s\n", mode.c_str());
+
+    dbg("exiting with code %d", rc);
+    return rc;
 }

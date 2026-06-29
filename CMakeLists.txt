@@ -56,20 +56,53 @@ if(NOT LIBUSB_FOUND)
 endif()
 
 # --- libuuu (built from source, drives the uuu-helper worker) ---
-# Vendored via FetchContent; SOURCE_SUBDIR builds only the static `uuc_s`
-# library target, not the upstream CLI.
+# On Windows we fetch the bundled libusb submodule so uuu-helper uses the exact
+# same libusb version (1.0.29) as the official NXP uuu binary. This matters
+# because libusb 1.0.28 introduced "base HID device descriptor on OS-cached
+# values", without which HID-mode NXP devices are invisible on Windows 10.
+# On Linux/macOS we skip the submodule and use the system libusb via pkg-config.
+if(WIN32)
+    set(_mfgtools_submodules "libusb")
+else()
+    set(_mfgtools_submodules "")
+endif()
+
 include(FetchContent)
 FetchContent_Declare(mfgtools
     GIT_REPOSITORY    https://github.com/nxp-imx/mfgtools.git
     GIT_TAG           uuu_1.5.243
-    GIT_SUBMODULES    ""        # we link system libraries, not bundled submodules
+    GIT_SUBMODULES    "${_mfgtools_submodules}"
     GIT_SHALLOW       TRUE
-    SOURCE_SUBDIR     libuuu
-    # libuuu generates gitversion.h with POSIX shell commands that fail on
-    # Windows; patch it to a portable cmake -E copy of a static header.
+    # No SOURCE_SUBDIR — we call add_subdirectory manually after setting
+    # LIBUSB_INCLUDE_DIRS so libuuu's patched CMakeLists.txt picks it up.
     PATCH_COMMAND     ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_libuuu.cmake
 )
-FetchContent_MakeAvailable(mfgtools)
+
+# Populate (download + patch) without processing libuuu's CMakeLists.txt yet.
+FetchContent_GetProperties(mfgtools)
+if(NOT mfgtools_POPULATED)
+    FetchContent_Populate(mfgtools)
+endif()
+
+if(WIN32)
+    # Point libuuu's include_directories() at the submodule header.
+    # libusb ships pre-built Windows DLLs inside its own git repo under
+    # build/<toolset>/<arch>/<config>/dll/ — the same path NXP's MSVC project uses.
+    set(_libusb_root "${mfgtools_SOURCE_DIR}/libusb")
+    set(LIBUSB_INCLUDE_DIRS "${_libusb_root}/libusb")
+    set(_libusb_dll_dir "${_libusb_root}/build/v143/x64/Release/dll")
+
+    add_library(libusb_bundled SHARED IMPORTED GLOBAL)
+    set_target_properties(libusb_bundled PROPERTIES
+        IMPORTED_IMPLIB   "${_libusb_dll_dir}/libusb-1.0.lib"
+        IMPORTED_LOCATION "${_libusb_dll_dir}/libusb-1.0.dll"
+        INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INCLUDE_DIRS}"
+    )
+endif()
+
+# Process libuuu — LIBUSB_INCLUDE_DIRS is now visible in this scope so the
+# patched guard skips pkg_check_modules on Windows.
+add_subdirectory("${mfgtools_SOURCE_DIR}/libuuu" "${mfgtools_BINARY_DIR}")
 
 # --- Sources ---
 set(SOURCES
@@ -140,6 +173,9 @@ target_link_libraries(UUUFlashTool PRIVATE Qt6::Core Qt6::Widgets Qt6::Svg)
 if(LIBUSB_FOUND)
     target_link_libraries(UUUFlashTool PRIVATE PkgConfig::LIBUSB)
     target_compile_definitions(UUUFlashTool PRIVATE HAVE_LIBUSB)
+elseif(WIN32 AND TARGET libusb_bundled)
+    target_link_libraries(UUUFlashTool PRIVATE libusb_bundled)
+    target_compile_definitions(UUUFlashTool PRIVATE HAVE_LIBUSB)
 endif()
 
 if(WIN32)
@@ -161,19 +197,31 @@ find_package(OpenSSL)
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(LIBZSTD  REQUIRED IMPORTED_TARGET libzstd)
     pkg_check_modules(TINYXML2 REQUIRED IMPORTED_TARGET tinyxml2)
-    pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
+    if(NOT WIN32)
+        pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
+    endif()
 endif()
 
 add_executable(uuu-helper helper/uuuhelper.cpp)
 target_include_directories(uuu-helper PRIVATE "${mfgtools_SOURCE_DIR}/libuuu")
 target_link_libraries(uuu-helper PRIVATE
     uuc_s
-    PkgConfig::HELPER_LIBUSB
     PkgConfig::LIBZSTD
     PkgConfig::TINYXML2
     BZip2::BZip2
     ZLIB::ZLIB
 )
+if(WIN32)
+    target_link_libraries(uuu-helper PRIVATE libusb_bundled)
+    # Copy bundled libusb-1.0.dll alongside the helper at build time
+    add_custom_command(TARGET uuu-helper POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${_libusb_dll_dir}/libusb-1.0.dll"
+            $<TARGET_FILE_DIR:uuu-helper>
+        COMMENT "Copying bundled libusb-1.0.dll")
+else()
+    target_link_libraries(uuu-helper PRIVATE PkgConfig::HELPER_LIBUSB)
+endif()
 if(OPENSSL_FOUND)
     target_link_libraries(uuu-helper PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
