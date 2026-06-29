@@ -93,3 +93,119 @@ file(READ "${buffersrc}" src)
 string(REPLACE "static mutex g_mutex_map;\n" "" src "${src}")
 string(REGEX REPLACE "\t+std::lock_guard<mutex> lock\\(g_mutex_map\\);\n" "" src "${src}")
 file(WRITE "${buffersrc}" "${src}")
+
+# Add trace points inside uuu_auto_detect_file so we can see exactly where
+# the crash is on Windows 10.
+set(cmdsrc "libuuu/cmd.cpp")
+file(READ "${cmdsrc}" src)
+string(REPLACE
+  "int uuu_auto_detect_file(const char *filename)
+{
+\tstring_ex fn;
+\tfn += remove_quota(filename);
+\tfn.replace('\\\\', '/');
+
+\tif (fn.empty())
+\t\tfn += \"./\";
+
+\tstring oldfn =fn;
+
+\tfn += \"/uuu.auto\";
+\tshared_ptr<FileBuffer> buffer = get_file_buffer(fn);
+\tif (buffer == nullptr)
+\t{
+\t\tfn.clear();
+\t\tfn += oldfn;
+\t\tsize_t pos = str_to_upper(fn).find(\"ZIP\");
+\t\tif(pos == string::npos || pos != fn.size() - 3)
+\t\t{
+\t\t\tpos = str_to_upper(fn).find(\"SDCARD\");
+\t\t\tif (pos == string::npos || pos != fn.size() - 6)
+\t\t\t\tbuffer = get_file_buffer(fn); //we don't try open a zip file here
+\t\t}
+
+\t\tif(buffer == nullptr)
+\t\t\treturn -1;
+\t}
+
+\tstring str= \"uuu_version\";
+\tshared_ptr<DataBuffer> pData = buffer->request_data(0, SIZE_MAX);
+\tif (!pData)
+\t\treturn -1;
+\tvoid *p1 = pData->data();
+\tvoid *p2 = (void*)str.data();
+\tif (memcmp(p1, p2, str.size()) == 0)
+\t{
+\t\tsize_t pos = fn.rfind('/');
+\t\tif (pos != string::npos)
+\t\t\tset_current_dir(fn.substr(0, pos + 1));
+
+\t\tg_cmd_list_file = fn.substr(pos+1);
+
+\t\treturn parser_cmd_list_file(pData);
+\t}
+
+\t//flash.bin or uboot.bin
+\treturn added_default_boot_cmd(fn.c_str());
+}"
+  "int uuu_auto_detect_file(const char *filename)
+{
+\tfprintf(stderr, \"[libuuu] auto_detect_file: enter fn=%s\\n\", filename ? filename : \"(null)\"); fflush(stderr);
+\tstring_ex fn;
+\tfn += remove_quota(filename);
+\tfn.replace('\\\\', '/');
+
+\tif (fn.empty())
+\t\tfn += \"./\";
+
+\tstring oldfn =fn;
+
+\tfn += \"/uuu.auto\";
+\tfprintf(stderr, \"[libuuu] auto_detect_file: get_file_buffer(%s)\\n\", fn.c_str()); fflush(stderr);
+\tshared_ptr<FileBuffer> buffer = get_file_buffer(fn);
+\tif (buffer == nullptr)
+\t{
+\t\tfn.clear();
+\t\tfn += oldfn;
+\t\tsize_t pos = str_to_upper(fn).find(\"ZIP\");
+\t\tif(pos == string::npos || pos != fn.size() - 3)
+\t\t{
+\t\t\tpos = str_to_upper(fn).find(\"SDCARD\");
+\t\t\tif (pos == string::npos || pos != fn.size() - 6) {
+\t\t\t\tfprintf(stderr, \"[libuuu] auto_detect_file: get_file_buffer(%s)\\n\", fn.c_str()); fflush(stderr);
+\t\t\t\tbuffer = get_file_buffer(fn); //we don't try open a zip file here
+\t\t\t\tfprintf(stderr, \"[libuuu] auto_detect_file: get_file_buffer done, buffer=%p\\n\", (void*)buffer.get()); fflush(stderr);
+\t\t\t}
+\t\t}
+
+\t\tif(buffer == nullptr)
+\t\t\treturn -1;
+\t}
+
+\tfprintf(stderr, \"[libuuu] auto_detect_file: request_data\\n\"); fflush(stderr);
+\tstring str= \"uuu_version\";
+\tshared_ptr<DataBuffer> pData = buffer->request_data(0, SIZE_MAX);
+\tfprintf(stderr, \"[libuuu] auto_detect_file: request_data done, pData=%p\\n\", (void*)pData.get()); fflush(stderr);
+\tif (!pData)
+\t\treturn -1;
+\tvoid *p1 = pData->data();
+\tvoid *p2 = (void*)str.data();
+\tif (memcmp(p1, p2, str.size()) == 0)
+\t{
+\t\tsize_t pos = fn.rfind('/');
+\t\tif (pos != string::npos)
+\t\t\tset_current_dir(fn.substr(0, pos + 1));
+
+\t\tg_cmd_list_file = fn.substr(pos+1);
+
+\t\treturn parser_cmd_list_file(pData);
+\t}
+
+\tfprintf(stderr, \"[libuuu] auto_detect_file: added_default_boot_cmd\\n\"); fflush(stderr);
+\t//flash.bin or uboot.bin
+\tint ret = added_default_boot_cmd(fn.c_str());
+\tfprintf(stderr, \"[libuuu] auto_detect_file: done ret=%d\\n\", ret); fflush(stderr);
+\treturn ret;
+}"
+  src "${src}")
+file(WRITE "${cmdsrc}" "${src}")
