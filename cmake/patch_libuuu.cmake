@@ -26,3 +26,42 @@ string(REPLACE
   t "${t}")
 
 file(WRITE "${cml}" "${t}")
+
+# Remove std::mutex from the USB device filter struct in usbhotplug.cpp.
+#
+# uuu_add_usbserial_no_filter / uuu_add_usbpath_filter crash on Windows 10
+# inside lock_guard<mutex> — suspected MSVC static-lib mutex-init issue.
+# These functions are always called from the main thread BEFORE polling_usb
+# starts any threads, so the mutex provides no actual safety benefit.
+# is_valid() is called from the polling thread, but only after push_back()
+# has already returned, so removing the lock there is also safe for our
+# single-setup / multi-read pattern.
+set(hotplug "libuuu/usbhotplug.cpp")
+file(READ "${hotplug}" src)
+
+string(REPLACE
+  "struct filter {
+\tvector<string> list;
+\tmutex lock;
+
+\tvoid push_back(string filter)
+\t{
+\t\tlock_guard<mutex> guard{lock};
+\t\tlist.emplace_back(std::move(filter));
+\t}
+};"
+  "struct filter {
+\tvector<string> list;
+
+\tvoid push_back(string filter)
+\t{
+\t\tlist.emplace_back(std::move(filter));
+\t}
+};"
+  src "${src}")
+
+# Also remove the lock_guard calls from is_valid() in both filter instances.
+string(REPLACE "lock_guard<mutex> guard{lock};\n\t\tif (list.empty())"
+               "if (list.empty())" src "${src}")
+
+file(WRITE "${hotplug}" "${src}")
