@@ -56,22 +56,63 @@ if(NOT LIBUSB_FOUND)
 endif()
 
 # --- libuuu (built from source, drives the uuu-helper worker) ---
-# On Windows we fetch the bundled libusb submodule so uuu-helper uses the exact
-# same libusb version (1.0.29) as the official NXP uuu binary. This matters
-# because libusb 1.0.28 introduced "base HID device descriptor on OS-cached
-# values", without which HID-mode NXP devices are invisible on Windows 10.
-# On Linux/macOS we skip the submodule and use the system libusb via pkg-config.
-if(WIN32)
-    set(_mfgtools_submodules "libusb")
-else()
-    set(_mfgtools_submodules "")
-endif()
+# On Windows we also fetch libusb v1.0.29 pre-built DLLs directly from the
+# libusb git repo (same version NXP uses in mfgtools). We fetch it separately
+# rather than as a mfgtools submodule because GIT_SHALLOW + GIT_SUBMODULES is
+# unreliable in CI and the submodule ends up empty.
 
 include(FetchContent)
+
+if(WIN32)
+    # libusb's git repo ships pre-built MSVC DLLs under build/<toolset>/x64/Release/dll/
+    FetchContent_Declare(libusb_win
+        GIT_REPOSITORY https://github.com/libusb/libusb.git
+        GIT_TAG        v1.0.29
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_GetProperties(libusb_win)
+    if(NOT libusb_win_POPULATED)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+        FetchContent_Populate(libusb_win)
+        cmake_policy(POP)
+    endif()
+
+    set(LIBUSB_INCLUDE_DIRS "${libusb_win_SOURCE_DIR}/libusb")
+
+    # Find the best pre-built DLL dir: prefer the current VS toolset, then fall
+    # back through known versions (v143=VS2022, v142=VS2019, v141=VS2017).
+    set(_libusb_dll_dir "")
+    foreach(_ts IN ITEMS "${CMAKE_VS_PLATFORM_TOOLSET}" v143 v142 v141)
+        if(_ts STREQUAL "")
+            continue()
+        endif()
+        set(_candidate "${libusb_win_SOURCE_DIR}/build/${_ts}/x64/Release/dll")
+        if(EXISTS "${_candidate}/libusb-1.0.lib")
+            set(_libusb_dll_dir "${_candidate}")
+            break()
+        endif()
+    endforeach()
+
+    if(_libusb_dll_dir STREQUAL "")
+        message(FATAL_ERROR
+            "No pre-built libusb DLLs found in ${libusb_win_SOURCE_DIR}/build/. "
+            "Tried toolsets: ${CMAKE_VS_PLATFORM_TOOLSET} v143 v142 v141")
+    endif()
+    message(STATUS "libusb pre-built DLLs: ${_libusb_dll_dir}")
+
+    add_library(libusb_bundled SHARED IMPORTED GLOBAL)
+    set_target_properties(libusb_bundled PROPERTIES
+        IMPORTED_IMPLIB   "${_libusb_dll_dir}/libusb-1.0.lib"
+        IMPORTED_LOCATION "${_libusb_dll_dir}/libusb-1.0.dll"
+        INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INCLUDE_DIRS}"
+    )
+endif()
+
 FetchContent_Declare(mfgtools
     GIT_REPOSITORY    https://github.com/nxp-imx/mfgtools.git
     GIT_TAG           uuu_1.5.243
-    GIT_SUBMODULES    "${_mfgtools_submodules}"
+    GIT_SUBMODULES    ""
     GIT_SHALLOW       TRUE
     # No SOURCE_SUBDIR — we call add_subdirectory manually after setting
     # LIBUSB_INCLUDE_DIRS so libuuu's patched CMakeLists.txt picks it up.
@@ -81,23 +122,10 @@ FetchContent_Declare(mfgtools
 # Populate (download + patch) without processing libuuu's CMakeLists.txt yet.
 FetchContent_GetProperties(mfgtools)
 if(NOT mfgtools_POPULATED)
+    cmake_policy(PUSH)
+    cmake_policy(SET CMP0169 OLD)
     FetchContent_Populate(mfgtools)
-endif()
-
-if(WIN32)
-    # Point libuuu's include_directories() at the submodule header.
-    # libusb ships pre-built Windows DLLs inside its own git repo under
-    # build/<toolset>/<arch>/<config>/dll/ — the same path NXP's MSVC project uses.
-    set(_libusb_root "${mfgtools_SOURCE_DIR}/libusb")
-    set(LIBUSB_INCLUDE_DIRS "${_libusb_root}/libusb")
-    set(_libusb_dll_dir "${_libusb_root}/build/v143/x64/Release/dll")
-
-    add_library(libusb_bundled SHARED IMPORTED GLOBAL)
-    set_target_properties(libusb_bundled PROPERTIES
-        IMPORTED_IMPLIB   "${_libusb_dll_dir}/libusb-1.0.lib"
-        IMPORTED_LOCATION "${_libusb_dll_dir}/libusb-1.0.dll"
-        INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INCLUDE_DIRS}"
-    )
+    cmake_policy(POP)
 endif()
 
 # Process libuuu — LIBUSB_INCLUDE_DIRS is now visible in this scope so the
