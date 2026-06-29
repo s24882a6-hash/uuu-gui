@@ -83,25 +83,14 @@ static std::string json_escape(const char* s)
 
 static void emit(const std::string& line)
 {
+    // Write JSON events to stderr — stdout is unreliable when the process is
+    // spawned by a GUI (WIN32-subsystem) parent on Windows (the inherited pipe
+    // handle is valid but Qt never reads from it). stderr is confirmed to work.
+    // The GUI splits stderr lines by prefix: '{' = JSON event, '[' = diagnostic.
     std::lock_guard<std::mutex> lk(g_out_mtx);
-#ifdef _WIN32
-    // When spawned from a GUI (WIN32-subsystem) parent, MSVC's CRT may fail to
-    // connect stdout to the inherited pipe handle. WriteFile bypasses the CRT.
-    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (h && h != INVALID_HANDLE_VALUE) {
-        DWORD w = 0;
-        WriteFile(h, line.c_str(), (DWORD)line.size(), &w, nullptr);
-        WriteFile(h, "\n", 1, &w, nullptr);
-    } else {
-        std::fputs(line.c_str(), stdout);
-        std::fputc('\n', stdout);
-        std::fflush(stdout);
-    }
-#else
-    std::fputs(line.c_str(), stdout);
-    std::fputc('\n', stdout);
-    std::fflush(stdout);
-#endif
+    std::fputs(line.c_str(), stderr);
+    std::fputc('\n', stderr);
+    std::fflush(stderr);
 }
 
 static void emit_log(const std::string& msg)

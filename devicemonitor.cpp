@@ -133,22 +133,33 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
         proc.waitForFinished(1000);
     }
 
-    // Always read both streams after finish or kill.
-    // On timeout the device JSON may already be in the pipe even though list_end
-    // was never written — libusb on Windows 10 can hang after the callback returns.
+    // JSON events are written to stderr (stdout is unreliable from a GUI parent
+    // on Windows). Split stderr lines: '{' prefix = JSON event, '[' = diagnostic.
     const QByteArray errBytes = proc.readAllStandardError();
-    if (!errBytes.isEmpty()) {
-        QString errText = QString::fromLocal8Bit(errBytes).trimmed();
-        appendHelperLog(errText);
-        emit helperDiagnostic(errText);
+
+    QByteArray jsonLines;
+    QByteArray diagLines;
+    for (const QByteArray& line : errBytes.split('\n')) {
+        const QByteArray t = line.trimmed();
+        if (t.isEmpty()) continue;
+        if (t.startsWith('{'))
+            jsonLines += t + '\n';
+        else
+            diagLines += t + '\n';
     }
 
-    const QByteArray output = proc.readAllStandardOutput();
-    appendHelperLog(output.isEmpty() ? "stdout: (empty)"
-                                     : "stdout: " + QString::fromUtf8(output).trimmed());
+    if (!diagLines.isEmpty()) {
+        QString diagText = QString::fromLocal8Bit(diagLines).trimmed();
+        appendHelperLog(diagText);
+        emit helperDiagnostic(diagText);
+    }
+    if (!jsonLines.isEmpty())
+        appendHelperLog("json: " + QString::fromUtf8(jsonLines).trimmed());
+    else
+        appendHelperLog("json: (empty)");
 
     QMap<QString, UsbDevice> result;
-    for (const UsbDevice& dev : parseHelperList(output))
+    for (const UsbDevice& dev : parseHelperList(jsonLines))
         result[dev.busId] = dev;
     return result;
 }
