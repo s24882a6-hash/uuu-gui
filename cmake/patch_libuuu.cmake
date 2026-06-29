@@ -65,3 +65,31 @@ string(REPLACE "lock_guard<mutex> guard{lock};\n\t\tif (list.empty())"
                "if (list.empty())" src "${src}")
 
 file(WRITE "${hotplug}" "${src}")
+
+# Same crash pattern in notify.cpp: static mutex g_mutex_notify.
+# Registration/unregistration only happens from the main thread before flash
+# threads start, and call_notify reads an immutable list during flash, so the
+# mutex provides no real safety benefit for our usage.
+set(notifysrc "libuuu/notify.cpp")
+file(READ "${notifysrc}" src)
+string(REPLACE "static mutex g_mutex_notify;\n" "" src "${src}")
+string(REPLACE "\tstd::lock_guard<mutex> lock(g_mutex_notify);\n" "" src "${src}")
+file(WRITE "${notifysrc}" "${src}")
+
+# Same crash pattern in error.cpp: static mutex g_last_error_str_mutex.
+# Error strings are diagnostic/last-write-wins; a benign race is acceptable.
+set(errorsrc "libuuu/error.cpp")
+file(READ "${errorsrc}" src)
+string(REPLACE "static mutex g_last_error_str_mutex;\n" "" src "${src}")
+string(REPLACE "\tlock_guard<mutex> l(g_last_error_str_mutex);\n" "" src "${src}")
+file(WRITE "${errorsrc}" "${src}")
+
+# Same crash pattern in buffer.cpp: static mutex g_mutex_map.
+# g_mutex_map protects the global buffer cache against concurrent open/close.
+# Our flash sequence is sequential (boot then emmc, single device), so no
+# concurrent buffer map access occurs in practice.
+set(buffersrc "libuuu/buffer.cpp")
+file(READ "${buffersrc}" src)
+string(REPLACE "static mutex g_mutex_map;\n" "" src "${src}")
+string(REGEX REPLACE "\t+std::lock_guard<mutex> lock\\(g_mutex_map\\);\n" "" src "${src}")
+file(WRITE "${buffersrc}" "${src}")
