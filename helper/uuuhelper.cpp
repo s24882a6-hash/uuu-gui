@@ -24,7 +24,13 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#ifdef _WIN32
+#  include <process.h>
+#else
+#  include <unistd.h>
+#endif
 #include <mutex>
 #include <string>
 #include <vector>
@@ -222,7 +228,11 @@ static int run_list()
 
     emit("{\"event\":\"list_end\"}");
     dbg("--- list mode end ---");
-    return 0;
+    // _exit skips C++ global destructors (including libusb's thread teardown)
+    // which can hang for several seconds on Windows 10 with HID devices.
+    std::fflush(stdout);
+    std::fflush(stderr);
+    _exit(0);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

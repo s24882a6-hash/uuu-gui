@@ -124,6 +124,18 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
 
     const bool finished = proc.waitForFinished(3000);
 
+    if (!finished) {
+        QString msg = QString("uuu-helper timed out (state=%1) — killing and reading partial output")
+                          .arg(proc.state());
+        appendHelperLog(msg);
+        emit helperDiagnostic(msg);
+        proc.kill();
+        proc.waitForFinished(1000);
+    }
+
+    // Always read both streams after finish or kill.
+    // On timeout the device JSON may already be in the pipe even though list_end
+    // was never written — libusb on Windows 10 can hang after the callback returns.
     const QByteArray errBytes = proc.readAllStandardError();
     if (!errBytes.isEmpty()) {
         QString errText = QString::fromLocal8Bit(errBytes).trimmed();
@@ -131,24 +143,11 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
         emit helperDiagnostic(errText);
     }
 
-    if (!finished) {
-        QString msg = QString("uuu-helper timed out or failed to start (state=%1 error=%2)")
-                          .arg(proc.state()).arg(proc.errorString());
-        appendHelperLog(msg);
-        emit helperDiagnostic(msg);
-        proc.kill();
-        return {};
-    }
+    const QByteArray output = proc.readAllStandardOutput();
+    appendHelperLog(output.isEmpty() ? "stdout: (empty)"
+                                     : "stdout: " + QString::fromUtf8(output).trimmed());
 
     QMap<QString, UsbDevice> result;
-    const QByteArray output = proc.readAllStandardOutput();
-
-    if (!output.isEmpty()) {
-        appendHelperLog("stdout: " + QString::fromUtf8(output).trimmed());
-    } else {
-        appendHelperLog("stdout: (empty)");
-    }
-
     for (const UsbDevice& dev : parseHelperList(output))
         result[dev.busId] = dev;
     return result;
