@@ -6,10 +6,10 @@
 #include <QTranslator>
 
 class QGroupBox;
-class QListWidget;
-class QListWidgetItem;
 class QComboBox;
 class QCheckBox;
+class QSplitter;
+class QTextEdit;
 class QLabel;
 class QPushButton;
 class QScrollArea;
@@ -36,7 +36,6 @@ private slots:
     void addPreset();
     void editPreset();
     void deletePreset();
-    void onPresetSelectionChanged();
 
     // Devices
     void onDeviceConnected(UsbDevice dev);
@@ -51,9 +50,6 @@ private slots:
     // Obtain the session password (prompting once) and retry the device elevated.
     // Serialized so parallel flashes don't stack password dialogs.
     void requestElevation(DeviceItemWidget* widget, bool passwordWasWrong);
-
-    // Auto-flash
-    void onAutoFlashToggled(bool enabled);
 
 private:
     // --- Setup ---
@@ -72,6 +68,7 @@ private:
     void applyLanguage(const QString& lang);
     void applySettings();
     FirmwarePreset* selectedPreset();
+    void updatePresetFilesLabel();
     void addDeviceWidget(const UsbDevice& dev);
     // Prompt for the administrator password (cached for the session). Returns
     // false if the user cancelled.
@@ -92,19 +89,20 @@ private:
     QMap<QString, DeviceItemWidget*> m_deviceWidgets;
 
     // --- UI elements ---
-    QGroupBox* m_groupPresets = nullptr;
-    QGroupBox* m_groupDevices = nullptr;
-    QListWidget* m_presetList   = nullptr;
-    QPushButton* m_btnAdd       = nullptr;
-    QPushButton* m_btnEdit      = nullptr;
-    QPushButton* m_btnDelete    = nullptr;
+    QSplitter*   m_splitter          = nullptr;
+    QGroupBox*   m_groupPresets     = nullptr;
+    QGroupBox*   m_groupDevices     = nullptr;
+    QComboBox*   m_presetCombo      = nullptr;
+    QTextEdit*   m_presetFilesLbl   = nullptr;
+    QPushButton* m_btnAdd           = nullptr;
+    QPushButton* m_btnEdit          = nullptr;
+    QPushButton* m_btnDelete        = nullptr;
 
     QVBoxLayout* m_devicesLayout= nullptr;
     QLabel*      m_noDevicesLbl = nullptr;
 
     QPushButton* m_btnSettings      = nullptr;
     QCheckBox*   m_autoFlash        = nullptr;
-    QComboBox*   m_autoPreset       = nullptr;
     QCheckBox*   m_chkRebootAfter   = nullptr;
     QPushButton* m_btnFlashSel      = nullptr;
     QLabel*      m_statusBar        = nullptr;

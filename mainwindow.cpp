@@ -11,21 +11,22 @@
 #include <QStyleHints>
 #include <QGroupBox>
 #include <QCloseEvent>
-#include <QComboBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFileInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSplitter>
+#include <QTextEdit>
+
 #include <QStatusBar>
 #include <QStyledItemDelegate>
 #include <QVBoxLayout>
@@ -168,7 +169,7 @@ void MainWindow::retranslateUi()
     m_btnDelete->setText(tr("Delete"));
     m_noDevicesLbl->setText(tr("No NXP devices detected.\nConnect a device in recovery / SDP mode."));
     m_btnSettings->setText(tr("Settings"));
-    m_autoFlash->setText(tr("Auto-flash on connect:"));
+    m_autoFlash->setText(tr("Auto-flash on connect"));
     m_chkRebootAfter->setText(tr("Reboot after flash"));
     m_btnFlashSel->setText(tr("Flash Checked Devices"));
 }
@@ -277,12 +278,13 @@ void MainWindow::setupUi()
     root->setSpacing(6);
     root->setContentsMargins(8, 8, 8, 8);
 
-    auto* splitter = new QSplitter(Qt::Horizontal, central);
-    splitter->addWidget(makePresetsPanel());
-    splitter->addWidget(makeDevicesPanel());
-    splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 3);
-    root->addWidget(splitter, 1);
+    m_splitter = new QSplitter(Qt::Horizontal, central);
+    m_splitter->addWidget(makePresetsPanel());
+    m_splitter->addWidget(makeDevicesPanel());
+    m_splitter->setStretchFactor(0, 0);
+    m_splitter->setStretchFactor(1, 1);
+    m_splitter->setSizes({220, 680});
+    root->addWidget(m_splitter, 1);
 
     root->addWidget(makeBottomBar());
 
@@ -294,34 +296,58 @@ QWidget* MainWindow::makePresetsPanel()
 {
     m_groupPresets = new QGroupBox(tr("Firmware Presets"), this);
     m_groupPresets->setMinimumWidth(0);
-    auto* group    = m_groupPresets;
-    auto* layout   = new QVBoxLayout(group);
-
-    m_presetList = new QListWidget(group);
-    m_presetList->setItemDelegate(new PresetDelegate(m_presetList));
-    layout->addWidget(m_presetList);
+    auto* group  = m_groupPresets;
+    auto* layout = new QVBoxLayout(group);
 
     auto* btnRow = new QHBoxLayout;
-    m_btnAdd    = new QPushButton(tr("Add"),  group);
-    m_btnEdit   = new QPushButton(tr("Edit"),    group);
-    m_btnDelete = new QPushButton(tr("Delete"),  group);
+    m_btnAdd    = new QPushButton(tr("Add"),    group);
+    m_btnEdit   = new QPushButton(tr("Edit"),   group);
+    m_btnDelete = new QPushButton(tr("Delete"), group);
     m_btnAdd->setMinimumWidth(0);
     m_btnEdit->setMinimumWidth(0);
     m_btnDelete->setMinimumWidth(0);
-    m_btnEdit->setEnabled(false);
-    m_btnDelete->setEnabled(false);
     btnRow->addWidget(m_btnAdd);
     btnRow->addWidget(m_btnEdit);
     btnRow->addWidget(m_btnDelete);
     layout->addLayout(btnRow);
 
+    m_presetCombo = new QComboBox(group);
+    layout->addWidget(m_presetCombo);
+
+    m_presetFilesLbl = new QTextEdit(group);
+    m_presetFilesLbl->setReadOnly(true);
+    m_presetFilesLbl->setFrameShape(QFrame::NoFrame);
+    m_presetFilesLbl->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_presetFilesLbl->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_presetFilesLbl->setWordWrapMode(QTextOption::WrapAnywhere);
+    m_presetFilesLbl->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_presetFilesLbl->setStyleSheet("background: transparent; color: gray;");
+    {
+        QFont f = m_presetFilesLbl->font();
+        f.setPointSize(qMax(f.pointSize() - 2, 7));
+        m_presetFilesLbl->setFont(f);
+        m_presetFilesLbl->setFixedHeight(QFontMetrics(f).lineSpacing() * 6 + 10);
+    }
+    layout->addWidget(m_presetFilesLbl);
+
+    m_autoFlash      = new QCheckBox(tr("Auto-flash on connect"), group);
+    m_chkRebootAfter = new QCheckBox(tr("Reboot after flash"), group);
+    layout->addWidget(m_autoFlash);
+    layout->addWidget(m_chkRebootAfter);
+
+    layout->addStretch();
+
     connect(m_btnAdd,    &QPushButton::clicked, this, &MainWindow::addPreset);
     connect(m_btnEdit,   &QPushButton::clicked, this, &MainWindow::editPreset);
     connect(m_btnDelete, &QPushButton::clicked, this, &MainWindow::deletePreset);
-    connect(m_presetList, &QListWidget::itemSelectionChanged,
-            this, &MainWindow::onPresetSelectionChanged);
-    connect(m_presetList, &QListWidget::itemDoubleClicked,
-            this, [this](QListWidgetItem*) { editPreset(); });
+    connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) {
+        FirmwarePreset* p = selectedPreset();
+        bool has = p != nullptr;
+        m_btnEdit->setEnabled(has);
+        m_btnDelete->setEnabled(has);
+        updatePresetFilesLabel();
+    });
 
     return group;
 }
@@ -362,21 +388,6 @@ QWidget* MainWindow::makeBottomBar()
     m_btnSettings->setFixedWidth(90);
     layout->addWidget(m_btnSettings);
 
-    layout->addSpacing(12);
-
-    m_autoFlash = new QCheckBox(tr("Auto-flash on connect:"), bar);
-    layout->addWidget(m_autoFlash);
-
-    m_autoPreset = new QComboBox(bar);
-    m_autoPreset->setEnabled(false);
-    m_autoPreset->setMinimumWidth(200);
-    layout->addWidget(m_autoPreset);
-
-    layout->addSpacing(16);
-
-    m_chkRebootAfter = new QCheckBox(tr("Reboot after flash"), bar);
-    layout->addWidget(m_chkRebootAfter);
-
     layout->addStretch();
 
     m_btnFlashSel = new QPushButton(tr("Flash Checked Devices"), bar);
@@ -384,7 +395,6 @@ QWidget* MainWindow::makeBottomBar()
     layout->addWidget(m_btnFlashSel);
 
     connect(m_btnSettings, &QPushButton::clicked,  this, &MainWindow::openSettings);
-    connect(m_autoFlash,   &QCheckBox::toggled,    this, &MainWindow::onAutoFlashToggled);
     connect(m_btnFlashSel, &QPushButton::clicked,  this, &MainWindow::flashSelected);
 
     return bar;
@@ -421,54 +431,47 @@ void MainWindow::applySettings()
 
 void MainWindow::refreshPresetList()
 {
-    QString selectedId;
-    if (!m_presetList->selectedItems().isEmpty())
-        selectedId = m_presetList->selectedItems().first()->data(Qt::UserRole).toString();
+    QString selectedId = m_presetCombo->currentData().toString();
 
-    m_presetList->clear();
-    for (const auto& p : m_presets) {
-        auto* item = new QListWidgetItem(m_presetList);
-        item->setText(p.name);
-        item->setToolTip(p.description());
-        item->setData(Qt::UserRole, p.id);
-
-        QStringList descLines;
-        switch (p.type) {
-        case FirmwarePreset::Type::SimpleBin:
-            descLines << "bin: " + QFileInfo(p.binPath).fileName();
-            break;
-        case FirmwarePreset::Type::EmmcAll:
-            descLines << "bootloader: " + QFileInfo(p.binPath).fileName();
-            descLines << "wic: "        + QFileInfo(p.wicPath).fileName();
-            break;
-        case FirmwarePreset::Type::EmmcAll4G:
-            descLines << "bin: "        + QFileInfo(p.bin4gPath).fileName();
-            descLines << "bootloader: " + QFileInfo(p.binPath).fileName();
-            descLines << "wic: "        + QFileInfo(p.wicPath).fileName();
-            break;
-        }
-        item->setData(kPresetDescRole, descLines.join("\n"));
+    {
+        QSignalBlocker blocker(m_presetCombo);
+        m_presetCombo->clear();
+        for (const auto& p : m_presets)
+            m_presetCombo->addItem(p.name, p.id);
     }
 
-    bool restored = false;
-    if (!selectedId.isEmpty()) {
-        for (int i = 0; i < m_presetList->count(); ++i) {
-            if (m_presetList->item(i)->data(Qt::UserRole).toString() == selectedId) {
-                m_presetList->setCurrentRow(i);
-                restored = true;
-                break;
-            }
-        }
-    }
-    if (!restored && m_presetList->count() > 0)
-        m_presetList->setCurrentRow(0);
+    int idx = m_presetCombo->findData(selectedId);
+    m_presetCombo->setCurrentIndex(idx >= 0 ? idx : (m_presetCombo->count() > 0 ? 0 : -1));
 
-    QString autoId = m_autoPreset->currentData().toString();
-    m_autoPreset->clear();
-    for (const auto& p : m_presets)
-        m_autoPreset->addItem(p.name, p.id);
-    int idx = m_autoPreset->findData(autoId);
-    if (idx >= 0) m_autoPreset->setCurrentIndex(idx);
+    bool has = selectedPreset() != nullptr;
+    m_btnEdit->setEnabled(has);
+    m_btnDelete->setEnabled(has);
+    updatePresetFilesLabel();
+}
+
+void MainWindow::updatePresetFilesLabel()
+{
+    FirmwarePreset* p = selectedPreset();
+    if (!p) {
+        m_presetFilesLbl->setPlainText({});
+        return;
+    }
+    QStringList lines;
+    switch (p->type) {
+    case FirmwarePreset::Type::SimpleBin:
+        lines << "bin: " + QFileInfo(p->binPath).fileName();
+        break;
+    case FirmwarePreset::Type::EmmcAll:
+        lines << "bootloader: " + QFileInfo(p->binPath).fileName();
+        lines << "wic: "        + QFileInfo(p->wicPath).fileName();
+        break;
+    case FirmwarePreset::Type::EmmcAll4G:
+        lines << "bin: "        + QFileInfo(p->bin4gPath).fileName();
+        lines << "bootloader: " + QFileInfo(p->binPath).fileName();
+        lines << "wic: "        + QFileInfo(p->wicPath).fileName();
+        break;
+    }
+    m_presetFilesLbl->setPlainText(lines.join("\n"));
 }
 
 void MainWindow::addPreset()
@@ -506,18 +509,9 @@ void MainWindow::deletePreset()
     refreshPresetList();
 }
 
-void MainWindow::onPresetSelectionChanged()
-{
-    bool sel = !m_presetList->selectedItems().isEmpty();
-    m_btnEdit->setEnabled(sel);
-    m_btnDelete->setEnabled(sel);
-}
-
 FirmwarePreset* MainWindow::selectedPreset()
 {
-    auto items = m_presetList->selectedItems();
-    if (items.isEmpty()) return nullptr;
-    QString id = items.first()->data(Qt::UserRole).toString();
+    QString id = m_presetCombo->currentData().toString();
     for (auto& p : m_presets)
         if (p.id == id) return &p;
     return nullptr;
@@ -568,13 +562,10 @@ void MainWindow::onDeviceConnected(UsbDevice dev)
     m_statusBar->setText(tr("Device connected: %1").arg(dev.displayName()));
 
     if (m_autoFlash->isChecked()) {
-        QString autoId = m_autoPreset->currentData().toString();
-        for (auto& p : m_presets) {
-            if (p.id == autoId) {
-                auto* w = m_deviceWidgets.value(dev.busId);
-                if (w) flashDevice(w, p);
-                break;
-            }
+        FirmwarePreset* p = selectedPreset();
+        if (p) {
+            auto* w = m_deviceWidgets.value(dev.busId);
+            if (w) flashDevice(w, *p);
         }
     }
 }
@@ -734,11 +725,6 @@ void MainWindow::flashSelected()
             tr("Check at least one device in the list."));
 }
 
-void MainWindow::onAutoFlashToggled(bool enabled)
-{
-    m_autoPreset->setEnabled(enabled);
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::loadSettings()
@@ -749,6 +735,8 @@ void MainWindow::loadSettings()
 
     m_autoFlash->setChecked(s.value("autoFlash", false).toBool());
     m_chkRebootAfter->setChecked(s.value("rebootAfterFlash", false).toBool());
+    if (s.contains("splitterState"))
+        m_splitter->restoreState(s.value("splitterState").toByteArray());
 
     QByteArray presetsJson = s.value("presets").toByteArray();
     if (!presetsJson.isEmpty()) {
@@ -765,6 +753,7 @@ void MainWindow::saveSettings()
     QSettings s;
     s.setValue("autoFlash",        m_autoFlash->isChecked());
     s.setValue("rebootAfterFlash", m_chkRebootAfter->isChecked());
+    s.setValue("splitterState",    m_splitter->saveState());
 
     QJsonArray arr;
     for (const auto& p : m_presets)
