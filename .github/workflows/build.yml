@@ -266,7 +266,10 @@ jobs:
 
       - name: Deploy
         run: |
-          windeployqt build/Release/UUUFlashTool.exe
+          # --compiler-runtime bundles msvcp140*/vcruntime140* next to the exe;
+          # without them the app picks up the system copies, which on Windows 10
+          # are often too old for binaries built by the latest MSVC STL.
+          windeployqt --compiler-runtime build/Release/UUUFlashTool.exe
           # Copy vcpkg runtime DLLs (zstd, tinyxml2, bzip2, zlib, openssl, libusb)
           Get-ChildItem "C:/vcpkg/installed/x64-windows/bin" -Filter "*.dll" |
             Copy-Item -Destination "build/Release/"
