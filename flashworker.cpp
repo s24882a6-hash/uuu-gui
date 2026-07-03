@@ -3,6 +3,15 @@
 #include <QJsonObject>
 #include <QProcess>
 
+// Best-effort: overwrite this copy's characters before releasing the buffer.
+// Implicitly-shared copies elsewhere (e.g. QProcess write buffers) are not
+// covered — QString cannot guarantee full erasure.
+static void wipePassword(QString& s)
+{
+    s.fill(QChar('\0'));
+    s.clear();
+}
+
 FlashWorker::FlashWorker(QObject* parent)
     : QObject(parent)
 {}
@@ -56,6 +65,7 @@ void FlashWorker::resetRunState()
     m_active          = true;
     m_permissionError = false;
     m_sudoAuthFailed  = false;
+    m_cancelRequested = false;
     m_lastError.clear();
     m_lineBuffer.clear();
 }
@@ -85,15 +95,23 @@ void FlashWorker::launchCurrentPhase()
 
     emit logLine(QString("$ %1 %2").arg(program, fullCmd.join(' ')));
 
+    // Force the C locale so sudo's auth-failure messages stay in English —
+    // handleEvent() detects a wrong password by matching those strings.
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (m_elevated) {
+        env.insert("LC_ALL", "C");
+        env.insert("LANG",   "C");
+    }
+    m_process->setProcessEnvironment(env);
+
     m_lineBuffer.clear();
     m_process->start(program, fullCmd);
 
-    // Feed the password to `sudo -S`. Queued until the process starts; the helper
-    // itself never reads stdin, so closing the channel afterwards is safe.
-    if (m_elevated) {
+    // Feed the password to `sudo -S`. Queued until the process starts. The write
+    // channel stays open for the whole run: the helper exits on stdin EOF, which
+    // is our cancellation mechanism (see cancel()).
+    if (m_elevated)
         m_process->write((m_password + "\n").toUtf8());
-        m_process->closeWriteChannel();
-    }
     // errorOccurred fires if the process fails to start — no blocking wait needed
 }
 
@@ -101,6 +119,11 @@ void FlashWorker::cancel()
 {
     if (m_phaseTimer) m_phaseTimer->stop();
     if (!m_process || !isRunning()) return;
+    m_cancelRequested = true;
+    // Closing stdin asks the helper to exit (it watches for EOF). This is the
+    // only way to stop an elevated flash: the root-owned process ignores our
+    // signals, so terminate()/kill() below cover just the unprivileged case.
+    m_process->closeWriteChannel();
     m_process->terminate();
     // Kill forcefully after 2s if still running
     QTimer::singleShot(2000, m_process, [this]() {
@@ -113,6 +136,7 @@ void FlashWorker::onErrorOccurred(QProcess::ProcessError error)
 {
     if (error == QProcess::FailedToStart) {
         m_active = false;
+        wipePassword(m_password);
         emit finished(false, QString("Failed to start helper: %1").arg(m_process->errorString()));
     }
 }
@@ -179,22 +203,32 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
         processLineBuffer();
     }
 
+    if (m_cancelRequested) {
+        m_active = false;
+        wipePassword(m_password);
+        emit finished(false, QStringLiteral("Canceled"));
+        return;
+    }
+
     bool phaseOk = (status == QProcess::NormalExit && exitCode == 0);
 
     if (!phaseOk && m_elevated && m_sudoAuthFailed) {
         m_active = false;
+        wipePassword(m_password);
         emit authFailed();
         return;
     }
 
     if (!phaseOk && (m_permissionError || exitCode == 2)) {
         m_active = false;
+        wipePassword(m_password);
         emit permissionError();
         return;
     }
 
     if (!phaseOk) {
         m_active = false;
+        wipePassword(m_password);
         QString errMsg = !m_lastError.isEmpty()
             ? m_lastError
             : (status == QProcess::CrashExit
@@ -207,6 +241,7 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
     m_currentPhase++;
     if (m_currentPhase >= m_phases.size()) {
         m_active = false;
+        wipePassword(m_password);
         emit progressChanged(100);
         emit finished(true, {});
         return;

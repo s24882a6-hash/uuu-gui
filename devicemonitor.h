@@ -3,6 +3,7 @@
 #include <QThread>
 #include <QMap>
 #include <QMutex>
+#include <QSet>
 #include <atomic>
 
 struct UsbDevice {
@@ -15,16 +16,17 @@ struct UsbDevice {
     QString displayName() const;
 };
 
-// Polls "uuu-helper list" every 500 ms to detect NXP devices via libuuu.
-// Uses the exact path strings libuuu reports. Falls back to libusb if the
-// helper path is not configured.
+// Detects NXP devices via libuuu ("uuu-helper list", exact path strings libuuu
+// reports). When built with libusb, a cheap passive enumeration (no device
+// opens, no process spawn) runs every 500 ms and the helper is only invoked
+// when the NXP device set actually changes (plus a periodic reconciliation).
+// Falls back to pure libusb scanning if the helper path is not configured.
 class DeviceMonitorThread : public QThread
 {
     Q_OBJECT
 public:
     explicit DeviceMonitorThread(QObject* parent = nullptr);
     void stop();
-    void setOpenAllowed(bool allowed) { m_openAllowed.store(allowed); }
     void setHelperPath(const QString& path);
 
     // Parse "uuu-helper list" JSON-line output into NXP device rows.
@@ -41,10 +43,11 @@ protected:
 private:
     QMap<QString, UsbDevice> scanViaHelper();
     QMap<QString, UsbDevice> scanViaLibusb();
+    // Passive libusb enumeration: "bus:addr" keys of NXP devices, no opens.
+    static QSet<QString> passiveNxpSet();
     static bool isNxpDevice(quint16 vid);
 
-    std::atomic<bool> m_stop        {false};
-    std::atomic<bool> m_openAllowed {true};
+    std::atomic<bool> m_stop {false};
 
     QMutex  m_helperMutex;
     QString m_helperPath;
@@ -59,7 +62,6 @@ public:
 
     void start();
     void stop();
-    void setOpenAllowed(bool allowed);
     void setHelperPath(const QString& path);
 
 signals:

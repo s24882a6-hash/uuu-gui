@@ -47,8 +47,8 @@ private slots:
     void flashDevice(DeviceItemWidget* widget, const FirmwarePreset& preset);
     void onDevicePermissionError(DeviceItemWidget* widget);
     void onDeviceAuthFailed(DeviceItemWidget* widget);
-    // Obtain the session password (prompting once) and retry the device elevated.
-    // Serialized so parallel flashes don't stack password dialogs.
+    // Resolve how to access the device (udev rule / sudo password / abort) and
+    // retry it. Serialized so parallel flashes don't stack dialogs.
     void requestElevation(DeviceItemWidget* widget, bool passwordWasWrong);
 
 private:
@@ -73,15 +73,22 @@ private:
     // Prompt for the administrator password (cached for the session). Returns
     // false if the user cancelled.
     bool promptPassword(bool incorrect);
+    enum class ElevationOutcome { Elevated, Unprivileged, Aborted };
+    // Ask the user how to gain device access: on Linux offers a one-time udev
+    // rule install (via pkexec) before falling back to the sudo password.
+    ElevationOutcome resolveElevation(bool passwordWasWrong);
+#ifdef Q_OS_LINUX
+    bool installUdevRule();
+#endif
 
     // --- Data ---
     QList<FirmwarePreset> m_presets;
     DeviceMonitor*        m_monitor          = nullptr;
-    int                   m_activeFlashCount = 0;
     QString               m_helperPath;
     QString               m_sessionPassword;     // cached administrator password
     bool                  m_useElevation     = false;
     bool                  m_promptInProgress = false;
+    bool                  m_udevOfferDeclined = false;
     QList<DeviceItemWidget*> m_pendingElevation; // devices awaiting the in-flight prompt
     QTranslator           m_translator;
 

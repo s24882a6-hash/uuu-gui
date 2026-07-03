@@ -148,7 +148,7 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaLibusb()
         dev.productId  = desc.idProduct;
 
         libusb_device_handle* handle = nullptr;
-        if (m_openAllowed.load() && libusb_open(list[i], &handle) == 0) {
+        if (libusb_open(list[i], &handle) == 0) {
             unsigned char buf[256] = {};
             if (desc.iProduct &&
                 libusb_get_string_descriptor_ascii(handle, desc.iProduct, buf, sizeof(buf)) > 0)
@@ -168,11 +168,40 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaLibusb()
 #endif
 }
 
+QSet<QString> DeviceMonitorThread::passiveNxpSet()
+{
+    QSet<QString> result;
+#ifdef HAVE_LIBUSB
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&ctx) < 0) return result;
+
+    libusb_device** list = nullptr;
+    ssize_t count = libusb_get_device_list(ctx, &list);
+
+    for (ssize_t i = 0; i < count; ++i) {
+        libusb_device_descriptor desc{};
+        if (libusb_get_device_descriptor(list[i], &desc) != 0) continue;
+        if (!isNxpDevice(desc.idVendor)) continue;
+        result << QString("%1:%2").arg(libusb_get_bus_number(list[i]))
+                                  .arg(libusb_get_device_address(list[i]));
+    }
+
+    if (list) libusb_free_device_list(list, 1);
+    libusb_exit(ctx);
+#endif
+    return result;
+}
+
 void DeviceMonitorThread::run()
 {
     QMap<QString, UsbDevice> known;
     bool helperModeActive  = false;
     bool noLibusbWarned    = false;
+#ifdef HAVE_LIBUSB
+    QSet<QString> lastPassive;
+    bool passivePrimed = false;
+#endif
+    int cyclesSinceHelperScan = 0;
 
     while (!m_stop) {
         QString helperPath;
@@ -181,18 +210,30 @@ void DeviceMonitorThread::run()
         QMap<QString, UsbDevice> current;
 
         if (!helperPath.isEmpty()) {
-            // Skip scanning while flashing — the helper has exclusive device access
-            if (!m_openAllowed.load()) {
-                msleep(500);
-                continue;
-            }
-            current = scanViaHelper();
             if (!helperModeActive) {
                 helperModeActive = true;
                 noLibusbWarned   = false;
                 // Clear known so we don't emit spurious disconnects when switching modes
                 known.clear();
+#ifdef HAVE_LIBUSB
+                passivePrimed = false;
+#endif
             }
+#ifdef HAVE_LIBUSB
+            // Cheap passive pre-check: only spawn the helper when the set of
+            // NXP devices changed, or every ~5 s as a reconciliation pass
+            // (serials/paths can change without the passive set noticing).
+            const QSet<QString> passive = passiveNxpSet();
+            const bool changed = !passivePrimed || passive != lastPassive;
+            lastPassive   = passive;
+            passivePrimed = true;
+            if (!changed && ++cyclesSinceHelperScan < 10) {
+                msleep(500);
+                continue;
+            }
+#endif
+            cyclesSinceHelperScan = 0;
+            current = scanViaHelper();
         } else {
             if (helperModeActive) {
                 // Switching away from helper mode — let known devices emit disconnects below
@@ -264,11 +305,6 @@ void DeviceMonitor::stop()
         m_thread->stop();
         m_thread->wait(4000); // > 3000ms proc.waitForFinished in scanViaHelper
     }
-}
-
-void DeviceMonitor::setOpenAllowed(bool allowed)
-{
-    m_thread->setOpenAllowed(allowed);
 }
 
 void DeviceMonitor::setHelperPath(const QString& path)

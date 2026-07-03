@@ -23,9 +23,11 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -293,6 +295,20 @@ static int finish(int rc, bool bestEffort)
     return permission ? 2 : 1;
 }
 
+// The GUI keeps our stdin pipe open for the whole flash and closes it to
+// request cancellation — it cannot signal us when we run under sudo (a
+// non-root process may not signal a root-owned one). Exit hard on EOF:
+// libuuu has no clean cross-thread abort. Note: with sudo -S the password
+// line is consumed by sudo itself before we ever read.
+static void start_stdin_watchdog()
+{
+    std::thread([] {
+        char buf[64];
+        while (std::fread(buf, 1, sizeof(buf), stdin) > 0) {}
+        std::_Exit(3);
+    }).detach();
+}
+
 static int run_phase(const std::vector<std::string>& args)
 {
     std::string serial, path, boot, bootloader, wic, cmd;
@@ -320,6 +336,7 @@ static int run_phase(const std::vector<std::string>& args)
     if (!serial.empty())     uuu_add_usbserial_no_filter(serial.c_str());
     else if (!path.empty())  uuu_add_usbpath_filter(path.c_str());
 
+    start_stdin_watchdog();
     uuu_register_notify_callback(notify_cb, nullptr);
     emit("{\"event\":\"phase_start\"}");
 

@@ -94,6 +94,13 @@ bool DeviceItemWidget::isFlashing() const
     return m_worker && m_worker->isActive();
 }
 
+bool DeviceItemWidget::recentlyFinishedFlash() const
+{
+    // The worker finishes slightly before the USB disconnect event arrives on
+    // the main thread; treat a just-finished device as still re-enumerating.
+    return m_finishTimer.isValid() && m_finishTimer.elapsed() < 5000;
+}
+
 void DeviceItemWidget::ensureWorker()
 {
     if (m_worker) return;
@@ -136,8 +143,10 @@ void DeviceItemWidget::flash(const QString& helperPath,
     if (s.value("saveLogs", false).toBool()) {
         QString dir = s.value("logDir").toString();
         if (!dir.isEmpty() && QDir().mkpath(dir)) {
+            // Sanitize a copy — replace() would mutate m_device.busId in place,
+            // breaking the --path device filter on the next flash.
             QString deviceId = m_device.serialNumber.isEmpty()
-                ? m_device.busId.replace(':', '-')
+                ? QString(m_device.busId).replace(':', '-')
                 : m_device.serialNumber;
             QString ts   = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
             QString name = QString("flash_%1_%2.log").arg(deviceId, ts);
@@ -152,6 +161,7 @@ void DeviceItemWidget::flash(const QString& helperPath,
         }
     }
 
+    m_finishTimer.invalidate();
     setFlashingState(true);
     m_worker->start();
 }
@@ -161,11 +171,15 @@ void DeviceItemWidget::cancelFlash()
     if (m_worker) m_worker->cancel();
 }
 
-void DeviceItemWidget::retryElevated(const QString& password)
+void DeviceItemWidget::retryFlash(const QString& password)
 {
     if (!m_worker) return;
-    if (m_logDialog) m_logDialog->appendLine(tr("Retrying with administrator privileges…"));
-    m_worker->setElevation(true, password);
+    if (m_logDialog)
+        m_logDialog->appendLine(password.isEmpty()
+            ? tr("Retrying…")
+            : tr("Retrying with administrator privileges…"));
+    m_worker->setElevation(!password.isEmpty(), password);
+    m_finishTimer.invalidate();
     setFlashingState(true);
     m_worker->start();
 }
@@ -177,6 +191,7 @@ bool DeviceItemWidget::isElevated() const
 
 void DeviceItemWidget::abortFlash(const QString& message)
 {
+    m_finishTimer.start();
     if (m_logFile.isOpen()) {
         m_logStream << "\n=== FAILED: " << message << " ===\n";
         m_logStream.flush();
@@ -234,6 +249,7 @@ void DeviceItemWidget::onLogLine(const QString& line)
 
 void DeviceItemWidget::onFlashFinished(bool success, const QString& err)
 {
+    m_finishTimer.start();
     if (m_logFile.isOpen()) {
         m_logStream << (success ? "\n=== DONE ===" : QString("\n=== FAILED: %1 ===").arg(err)) << '\n';
         m_logStream.flush();
