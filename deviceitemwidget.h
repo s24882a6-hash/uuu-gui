@@ -2,6 +2,7 @@
 #include "devicemonitor.h"
 #include "firmwarepreset.h"
 #include <QWidget>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QTextStream>
 
@@ -22,6 +23,8 @@ public:
     const UsbDevice& device() const { return m_device; }
     bool isChecked() const;
     bool isFlashing() const;
+    // True shortly after a flash ended — the device is likely re-enumerating.
+    bool recentlyFinishedFlash() const;
 
     void flash(const QString& helperPath,
                const FirmwarePreset& preset,
@@ -29,8 +32,9 @@ public:
                const QString& password = {});   // empty = run unprivileged
     void cancelFlash();
 
-    // Re-run the current flash elevated, feeding `password` to sudo.
-    void retryElevated(const QString& password);
+    // Re-run the current flash; a non-empty `password` runs it via sudo,
+    // an empty one retries unprivileged (e.g. after installing a udev rule).
+    void retryFlash(const QString& password);
     bool isElevated() const;
     // Abort with an error message (e.g. when the user cancels the password prompt).
     void abortFlash(const QString& message);
@@ -63,6 +67,7 @@ private:
 
     QFile           m_logFile;
     QTextStream     m_logStream;
+    QElapsedTimer   m_finishTimer;   // started when a flash ends (see recentlyFinishedFlash)
 
     QCheckBox*   m_check     = nullptr;
     QLabel*      m_lblName   = nullptr;

@@ -31,13 +31,13 @@ The tool **embeds** NXP's `libuuu` (built from source) and drives it through a s
 ## Features
 
 - **Firmware presets** — save and reuse flash configurations (files, type, inter-phase delay)
-- **Automatic device detection** — polls `uuu-helper list` (libuuu) every 500 ms; no manual bus path entry
+- **Automatic device detection** — lightweight libusb scan every 500 ms, with `uuu-helper list` (libuuu) invoked only when the device set changes; no manual bus path entry
 - **Parallel flashing** — each connected device gets its own `uuu-helper` process, filtered to that device's serial
 - **Multi-phase flashing** — for boards requiring a 4 GB RAM init step before the main eMMC flash
 - **USB re-enumeration handling** — libuuu re-locates the board by serial number after SDP boot, across the re-enumeration
 - **Auto-flash on connect** — automatically start flashing when a device is plugged in
 - **Reboot after flash** — send `FB: reboot` when done
-- **On-demand privileges** — flashing runs unprivileged; if the device can't be accessed, the app asks for your password once per session and re-runs the flash via `sudo` (no privilege selector to configure)
+- **On-demand privileges** — flashing runs unprivileged; if the device can't be accessed, on Linux the app offers to install a udev rule via `pkexec` (one-time permanent fix) or falls back to `sudo` with your password (asked once per session)
 - **Log files** — optional timestamped `.log` file per device, written in UTF-8
 - **Bilingual UI** — English and Russian, switchable at runtime without restart
 
@@ -141,7 +141,7 @@ Download from the **Actions** tab → latest successful run → **Artifacts**:
 1. Define a **firmware preset** (left panel → **Add**): pick a type and the file(s) to flash.
 2. Connect an NXP board in recovery / SDP mode — it appears automatically in the device list.
 3. Select the preset and click **Flash** on the device row, or **Flash Checked Devices** for several at once.
-4. If the device can't be accessed without elevated privileges, the app asks for your password once and re-runs the flash via `sudo` (cached for the rest of the session).
+4. If the device can't be accessed without elevated privileges, on Linux the app offers to install a udev rule (permanent fix); otherwise it asks for your password once and re-runs the flash via `sudo` (cached for the rest of the session).
 
 ### Settings
 

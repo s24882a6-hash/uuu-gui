@@ -68,6 +68,7 @@ private:
     bool               m_rebootAfterFlash  = false;
     bool               m_permissionError   = false;
     bool               m_sudoAuthFailed    = false;
+    bool               m_cancelRequested   = false;
     QString            m_lastError;
     QByteArray         m_lineBuffer;
 };
