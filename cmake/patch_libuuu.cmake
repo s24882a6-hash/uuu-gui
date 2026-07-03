@@ -209,3 +209,115 @@ string(REPLACE
 }"
   src "${src}")
 file(WRITE "${cmdsrc}" "${src}")
+
+# Add trace points inside FileBuffer::mapfile's Windows branch so we can see
+# exactly which WinAPI call crashes on Windows 10 (CreateFile / oplock
+# DeviceIoControl / CreateFileMapping / MapViewOfFile).
+file(READ "${buffersrc}" src)
+string(REPLACE
+  "\t\tm_OverLapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+\t\tResetEvent(m_OverLapped.hEvent);
+
+\t\tm_file_handle = CreateFile(filename.c_str(),
+\t\t\tGENERIC_READ,
+\t\t\tFILE_SHARE_READ | FILE_SHARE_WRITE,
+\t\t\tnullptr,
+\t\t\tOPEN_EXISTING,
+\t\t\tFILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED,
+\t\t\tnullptr);
+
+\t\tif (m_file_handle == INVALID_HANDLE_VALUE)
+\t\t{
+\t\t\tstring err = \"Create File Failure \";
+\t\t\terr += filename;
+\t\t\tset_last_err_string(err);
+\t\t\treturn -1;
+\t\t}
+
+\t\tBOOL bSuccess = DeviceIoControl(m_file_handle,
+\t\t\tFSCTL_REQUEST_OPLOCK,
+\t\t\t&m_Request,
+\t\t\tsizeof(m_Request),
+\t\t\t&Response,
+\t\t\tsizeof(Response),
+\t\t\tnullptr,
+\t\t\t&m_OverLapped);
+
+\t\tif (bSuccess || GetLastError() == ERROR_IO_PENDING)
+\t\t{
+\t\t\tm_file_monitor = thread(file_overwrite_monitor, filename, this);
+\t\t}
+
+\t\tm_file_map = CreateFileMapping(m_file_handle,
+\t\t\tnullptr, PAGE_READONLY, 0, 0, nullptr);
+
+\t\tif (m_file_map == INVALID_HANDLE_VALUE)
+\t\t{
+\t\t\tset_last_err_string(\"Fail create Map\");
+\t\t\treturn -1;
+\t\t}
+
+\t\tm_pDatabuffer = (uint8_t *)MapViewOfFile(m_file_map, FILE_MAP_READ, 0, 0, sz);
+\t\tm_DataSize = sz;
+\t\tm_MemSize = sz;
+\t\tm_allocate_way = ALLOCATION_WAYS::MMAP;
+"
+  "\t\tfprintf(stderr, \"[libuuu] mapfile: CreateEvent\\n\"); fflush(stderr);
+\t\tm_OverLapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+\t\tResetEvent(m_OverLapped.hEvent);
+
+\t\tfprintf(stderr, \"[libuuu] mapfile: CreateFile(%s) sz=%zu\\n\", filename.c_str(), sz); fflush(stderr);
+\t\tm_file_handle = CreateFile(filename.c_str(),
+\t\t\tGENERIC_READ,
+\t\t\tFILE_SHARE_READ | FILE_SHARE_WRITE,
+\t\t\tnullptr,
+\t\t\tOPEN_EXISTING,
+\t\t\tFILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED,
+\t\t\tnullptr);
+\t\tfprintf(stderr, \"[libuuu] mapfile: CreateFile done handle=%p\\n\", (void*)m_file_handle); fflush(stderr);
+
+\t\tif (m_file_handle == INVALID_HANDLE_VALUE)
+\t\t{
+\t\t\tstring err = \"Create File Failure \";
+\t\t\terr += filename;
+\t\t\tset_last_err_string(err);
+\t\t\treturn -1;
+\t\t}
+
+\t\tfprintf(stderr, \"[libuuu] mapfile: DeviceIoControl FSCTL_REQUEST_OPLOCK\\n\"); fflush(stderr);
+\t\tBOOL bSuccess = DeviceIoControl(m_file_handle,
+\t\t\tFSCTL_REQUEST_OPLOCK,
+\t\t\t&m_Request,
+\t\t\tsizeof(m_Request),
+\t\t\t&Response,
+\t\t\tsizeof(Response),
+\t\t\tnullptr,
+\t\t\t&m_OverLapped);
+\t\tfprintf(stderr, \"[libuuu] mapfile: DeviceIoControl done bSuccess=%d err=%lu\\n\", bSuccess, GetLastError()); fflush(stderr);
+
+\t\tif (bSuccess || GetLastError() == ERROR_IO_PENDING)
+\t\t{
+\t\t\tfprintf(stderr, \"[libuuu] mapfile: starting file_overwrite_monitor thread\\n\"); fflush(stderr);
+\t\t\tm_file_monitor = thread(file_overwrite_monitor, filename, this);
+\t\t}
+
+\t\tfprintf(stderr, \"[libuuu] mapfile: CreateFileMapping\\n\"); fflush(stderr);
+\t\tm_file_map = CreateFileMapping(m_file_handle,
+\t\t\tnullptr, PAGE_READONLY, 0, 0, nullptr);
+\t\tfprintf(stderr, \"[libuuu] mapfile: CreateFileMapping done map=%p\\n\", (void*)m_file_map); fflush(stderr);
+
+\t\tif (m_file_map == INVALID_HANDLE_VALUE)
+\t\t{
+\t\t\tset_last_err_string(\"Fail create Map\");
+\t\t\treturn -1;
+\t\t}
+
+\t\tfprintf(stderr, \"[libuuu] mapfile: MapViewOfFile sz=%zu\\n\", sz); fflush(stderr);
+\t\tm_pDatabuffer = (uint8_t *)MapViewOfFile(m_file_map, FILE_MAP_READ, 0, 0, sz);
+\t\tfprintf(stderr, \"[libuuu] mapfile: MapViewOfFile done ptr=%p err=%lu\\n\", (void*)m_pDatabuffer, GetLastError()); fflush(stderr);
+\t\tm_DataSize = sz;
+\t\tm_MemSize = sz;
+\t\tm_allocate_way = ALLOCATION_WAYS::MMAP;
+"
+  src "${src}")
+file(WRITE "${buffersrc}" "${src}")
