@@ -36,7 +36,6 @@ signals:
     void deviceConnected(UsbDevice device);
     void deviceDisconnected(QString busId);
     void monitoringUnavailable(QString reason);
-    void helperDiagnostic(QString text);
 
 protected:
     void run() override;
@@ -69,7 +68,6 @@ signals:
     void deviceConnected(UsbDevice device);
     void deviceDisconnected(QString busId);
     void monitoringUnavailable(QString reason);
-    void helperDiagnostic(QString text);
 
 private:
     DeviceMonitorThread* m_thread = nullptr;

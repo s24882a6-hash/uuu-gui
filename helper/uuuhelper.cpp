@@ -21,14 +21,12 @@
 
 #include "libuuu.h"
 
-#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #ifdef _WIN32
 #  include <process.h>
-#  include <windows.h>
 #else
 #  include <unistd.h>
 #endif
@@ -36,21 +34,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Diagnostic logging to stderr (never touches the JSON stdout protocol)
-// ──────────────────────────────────────────────────────────────────────────────
-
-static void dbg(const char* fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    std::fprintf(stderr, "[uuu-helper] ");
-    std::vfprintf(stderr, fmt, ap);
-    std::fprintf(stderr, "\n");
-    std::fflush(stderr);
-    va_end(ap);
-}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // JSON output
@@ -84,11 +67,11 @@ static std::string json_escape(const char* s)
 
 static void emit(const std::string& line)
 {
-    // Write JSON events to stderr — stdout is unreliable when the process is
+    // JSON events go to stderr — stdout is unreliable when the process is
     // spawned by a GUI (WIN32-subsystem) parent on Windows (the inherited pipe
-    // handle is valid but Qt never reads from it). stderr is confirmed to work.
-    // The GUI splits stderr lines by prefix: '{' = JSON event, '[' = diagnostic.
-    // No mutex: list mode is single-threaded; mutex would deadlock on re-entry.
+    // handle is valid but Qt never reads from it). The GUI treats '{'-prefixed
+    // stderr lines as events and everything else as log text.
+    std::lock_guard<std::mutex> lk(g_out_mtx);
     std::fprintf(stderr, "%s\n", line.c_str());
     std::fflush(stderr);
 }
@@ -186,7 +169,6 @@ static int list_cb(const char* path, const char* chip, const char* pro,
                    uint16_t vid, uint16_t pid, uint16_t bcd,
                    const char* serial, void*)
 {
-    dbg("list_cb: enter path=%s", path ? path : "(null)");
     std::string s = "{\"event\":\"device\"";
     s += ",\"path\":\""   + json_escape(path)   + "\"";
     s += ",\"chip\":\""   + json_escape(chip)   + "\"";
@@ -195,47 +177,14 @@ static int list_cb(const char* path, const char* chip, const char* pro,
     s += ",\"pid\":"      + std::to_string(pid);
     s += ",\"bcd\":"      + std::to_string(bcd);
     s += ",\"serial\":\"" + json_escape(serial) + "\"}";
-    dbg("list_cb: emitting %zu bytes", s.size());
     emit(s);
-    dbg("list_cb: emit done");
     return 0;
-}
-
-struct ListCtx { int count = 0; };
-
-static int list_cb_debug(const char* path, const char* chip, const char* pro,
-                         uint16_t vid, uint16_t pid, uint16_t bcd,
-                         const char* serial, void* ctx)
-{
-    auto* lctx = static_cast<ListCtx*>(ctx);
-    lctx->count++;
-    dbg("  NXP device #%d: path=%s chip=%s pro=%s vid=0x%04x pid=0x%04x bcd=0x%04x serial=%s",
-        lctx->count,
-        path   ? path   : "(null)",
-        chip   ? chip   : "(null)",
-        pro    ? pro    : "(null)",
-        (unsigned)vid, (unsigned)pid, (unsigned)bcd,
-        serial ? serial : "(null)");
-    return list_cb(path, chip, pro, vid, pid, bcd, serial, nullptr);
 }
 
 static int run_list()
 {
-    dbg("--- list mode start ---");
-    dbg("libuuu version: %s", uuu_get_version_string());
-
-    ListCtx ctx;
-    dbg("calling uuu_for_each_devices...");
-    int rc = uuu_for_each_devices(list_cb_debug, &ctx);
-    dbg("uuu_for_each_devices returned %d, NXP devices found: %d", rc, ctx.count);
-
-    if (rc < 0) {
-        const char* err = uuu_get_last_err_string();
-        dbg("error: %s", err && *err ? err : "(no error string)");
-    }
-
+    uuu_for_each_devices(list_cb, nullptr);
     emit("{\"event\":\"list_end\"}");
-    dbg("--- list mode end ---");
     // _exit skips C++ global destructors (including libusb's thread teardown)
     // which can hang for several seconds on Windows 10 with HID devices.
     std::fflush(stdout);
@@ -374,7 +323,6 @@ static void start_stdin_watchdog()
 
 static int run_phase(const std::vector<std::string>& args)
 {
-    dbg("run_phase: start, %zu args", args.size());
     std::string serial, path, boot, bootloader, wic, cmd;
     bool haveBoot = false, haveEmmc = false, haveCmd = false, bestEffort = false;
 
@@ -395,34 +343,19 @@ static int run_phase(const std::vector<std::string>& args)
         else if (a == "--besteffort") bestEffort = true;
     }
 
-    dbg("run_phase: parsed: serial='%s' boot='%s' haveBoot=%d haveEmmc=%d haveCmd=%d",
-        serial.c_str(), boot.c_str(), haveBoot, haveEmmc, haveCmd);
-
     // Target a single device. Prefer serial — it survives USB re-enumeration
     // between SDP and fastboot, so libuuu re-finds the board on its own.
-    if (!serial.empty()) {
-        dbg("run_phase: uuu_add_usbserial_no_filter(%s)", serial.c_str());
-        uuu_add_usbserial_no_filter(serial.c_str());
-        dbg("run_phase: filter set");
-    } else if (!path.empty()) {
-        dbg("run_phase: uuu_add_usbpath_filter(%s)", path.c_str());
-        uuu_add_usbpath_filter(path.c_str());
-        dbg("run_phase: filter set");
-    }
+    if (!serial.empty())     uuu_add_usbserial_no_filter(serial.c_str());
+    else if (!path.empty())  uuu_add_usbpath_filter(path.c_str());
 
     start_stdin_watchdog();
-    dbg("run_phase: registering notify_cb");
     uuu_register_notify_callback(notify_cb, nullptr);
-    dbg("run_phase: emitting phase_start");
     emit("{\"event\":\"phase_start\"}");
 
     int rc = 0;
     if (haveBoot) {
-        dbg("run_phase: uuu_auto_detect_file(%s)", boot.c_str());
         rc = uuu_auto_detect_file(boot.c_str());
-        dbg("run_phase: uuu_auto_detect_file returned %d", rc);
         if (rc == 0) rc = uuu_wait_uuu_finish(0, 0);
-        dbg("run_phase: uuu_wait_uuu_finish returned %d", rc);
     } else if (haveEmmc) {
         std::string script = substitute_tokens(kEmmcAllTemplate, bootloader, wic);
         rc = uuu_run_cmd_script(script.c_str(), 0);
@@ -448,16 +381,6 @@ static int run_phase(const std::vector<std::string>& args)
 
 int main(int argc, char** argv)
 {
-    dbg("started, argc=%d", argc);
-    for (int i = 0; i < argc; i++)
-        dbg("  argv[%d] = %s", i, argv[i] ? argv[i] : "(null)");
-#ifdef _WIN32
-    {
-        HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-        dbg("stdout HANDLE=%p (INVALID=%p null=%p)", h, INVALID_HANDLE_VALUE, (void*)nullptr);
-    }
-#endif
-
     if (argc < 2) {
         std::fprintf(stderr, "usage: uuu-helper list | phase <opts>\n");
         return 64;
@@ -466,13 +389,9 @@ int main(int argc, char** argv)
     std::string mode = argv[1];
     std::vector<std::string> rest(argv + 2, argv + argc);
 
-    dbg("mode: %s", mode.c_str());
+    if (mode == "list")  return run_list();
+    if (mode == "phase") return run_phase(rest);
 
-    int rc = 64;
-    if (mode == "list")       rc = run_list();
-    else if (mode == "phase") rc = run_phase(rest);
-    else std::fprintf(stderr, "unknown mode: %s\n", mode.c_str());
-
-    dbg("exiting with code %d", rc);
-    return rc;
+    std::fprintf(stderr, "unknown mode: %s\n", mode.c_str());
+    return 64;
 }

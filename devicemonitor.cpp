@@ -3,10 +3,6 @@
 #include <QProcess>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QCoreApplication>
-#include <QDateTime>
-#include <QFile>
-#include <QTextStream>
 
 #ifdef HAVE_LIBUSB
 #  include <libusb.h>
@@ -97,16 +93,6 @@ QList<UsbDevice> DeviceMonitorThread::parseHelperList(const QByteArray& output)
     return devices;
 }
 
-static void appendHelperLog(const QString& text)
-{
-    QString logPath = QCoreApplication::applicationDirPath() + "/uuu-helper-debug.log";
-    QFile f(logPath);
-    if (!f.open(QIODevice::Append | QIODevice::Text))
-        return;
-    QTextStream out(&f);
-    out << "[" << QDateTime::currentDateTime().toString(Qt::ISODate) << "] " << text << "\n";
-}
-
 QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
 {
     QString helperPath;
@@ -118,48 +104,20 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
     if (helperPath.isEmpty()) return {};
 
     QProcess proc;
+    // Always list without elevation — enumerating devices doesn't need root, and
+    // sudo without a terminal would block waiting for a password.
     proc.setProgram(helperPath);
     proc.setArguments({"list"});
     proc.start();
-
-    const bool finished = proc.waitForFinished(3000);
-
-    if (!finished) {
-        QString msg = QString("uuu-helper timed out (state=%1) — killing and reading partial output")
-                          .arg(proc.state());
-        appendHelperLog(msg);
-        emit helperDiagnostic(msg);
+    if (!proc.waitForFinished(3000)) {
         proc.kill();
         proc.waitForFinished(1000);
     }
 
-    // JSON events are written to stderr (stdout is unreliable from a GUI parent
-    // on Windows). Split stderr lines: '{' prefix = JSON event, '[' = diagnostic.
-    const QByteArray errBytes = proc.readAllStandardError();
-
-    QByteArray jsonLines;
-    QByteArray diagLines;
-    for (const QByteArray& line : errBytes.split('\n')) {
-        const QByteArray t = line.trimmed();
-        if (t.isEmpty()) continue;
-        if (t.startsWith('{'))
-            jsonLines += t + '\n';
-        else
-            diagLines += t + '\n';
-    }
-
-    if (!diagLines.isEmpty()) {
-        QString diagText = QString::fromLocal8Bit(diagLines).trimmed();
-        appendHelperLog(diagText);
-        emit helperDiagnostic(diagText);
-    }
-    if (!jsonLines.isEmpty())
-        appendHelperLog("json: " + QString::fromUtf8(jsonLines).trimmed());
-    else
-        appendHelperLog("json: (empty)");
-
+    // JSON events arrive on stderr (stdout is unreliable from a GUI parent on
+    // Windows); parseHelperList skips any non-JSON lines.
     QMap<QString, UsbDevice> result;
-    for (const UsbDevice& dev : parseHelperList(jsonLines))
+    for (const UsbDevice& dev : parseHelperList(proc.readAllStandardError()))
         result[dev.busId] = dev;
     return result;
 }
@@ -329,8 +287,6 @@ DeviceMonitor::DeviceMonitor(QObject* parent)
             this,     &DeviceMonitor::deviceDisconnected);
     connect(m_thread, &DeviceMonitorThread::monitoringUnavailable,
             this,     &DeviceMonitor::monitoringUnavailable);
-    connect(m_thread, &DeviceMonitorThread::helperDiagnostic,
-            this,     &DeviceMonitor::helperDiagnostic);
 }
 
 DeviceMonitor::~DeviceMonitor()
