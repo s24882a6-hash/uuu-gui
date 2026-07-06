@@ -66,29 +66,20 @@ if(NOT LIBUSB_FOUND)
 endif()
 
 # --- libuuu (built from source, drives the uuu-helper worker) ---
-
+# Vendored via FetchContent; SOURCE_SUBDIR builds only the static `uuc_s`
+# library target, not the upstream CLI.
 include(FetchContent)
-
 FetchContent_Declare(mfgtools
     GIT_REPOSITORY    https://github.com/nxp-imx/mfgtools.git
     GIT_TAG           uuu_1.5.243
-    GIT_SUBMODULES    ""
+    GIT_SUBMODULES    ""        # we link system libraries, not bundled submodules
     GIT_SHALLOW       TRUE
-    # No SOURCE_SUBDIR — we call add_subdirectory manually after setting
-    # LIBUSB_INCLUDE_DIRS so libuuu's patched CMakeLists.txt picks it up.
+    SOURCE_SUBDIR     libuuu
+    # libuuu generates gitversion.h with POSIX shell commands that fail on
+    # Windows; patch it to a portable cmake -E copy of a static header.
     PATCH_COMMAND     ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_libuuu.cmake
 )
-
-# Populate (download + patch) without processing libuuu's CMakeLists.txt yet.
-FetchContent_GetProperties(mfgtools)
-if(NOT mfgtools_POPULATED)
-    cmake_policy(PUSH)
-    cmake_policy(SET CMP0169 OLD)
-    FetchContent_Populate(mfgtools)
-    cmake_policy(POP)
-endif()
-
-add_subdirectory("${mfgtools_SOURCE_DIR}/libuuu" "${mfgtools_BINARY_DIR}")
+FetchContent_MakeAvailable(mfgtools)
 
 # --- Sources ---
 set(SOURCES
@@ -178,8 +169,8 @@ find_package(BZip2 REQUIRED)
 find_package(ZLIB  REQUIRED)
 find_package(OpenSSL)
 if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBZSTD     REQUIRED IMPORTED_TARGET libzstd)
-    pkg_check_modules(TINYXML2    REQUIRED IMPORTED_TARGET tinyxml2)
+    pkg_check_modules(LIBZSTD  REQUIRED IMPORTED_TARGET libzstd)
+    pkg_check_modules(TINYXML2 REQUIRED IMPORTED_TARGET tinyxml2)
     pkg_check_modules(HELPER_LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 endif()
 
@@ -187,9 +178,9 @@ add_executable(uuu-helper helper/uuuhelper.cpp)
 target_include_directories(uuu-helper PRIVATE "${mfgtools_SOURCE_DIR}/libuuu")
 target_link_libraries(uuu-helper PRIVATE
     uuc_s
+    PkgConfig::HELPER_LIBUSB
     PkgConfig::LIBZSTD
     PkgConfig::TINYXML2
-    PkgConfig::HELPER_LIBUSB
     BZip2::BZip2
     ZLIB::ZLIB
 )
