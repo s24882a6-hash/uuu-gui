@@ -24,6 +24,7 @@ private slots:
 private:
     void setupUi();
     void populate(const FirmwarePreset& p);
+    QString autoName() const;
 
     QLineEdit*    m_name        = nullptr;
     QRadioButton* m_rdSimple    = nullptr;

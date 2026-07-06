@@ -12,6 +12,8 @@
 #include <QFileDialog>
 #include <QDialogButtonBox>
 #include <QFileInfo>
+#include <QDateTime>
+#include <QRegularExpression>
 
 PresetDialog::PresetDialog(QWidget* parent)
     : QDialog(parent)
@@ -35,13 +37,15 @@ PresetDialog::PresetDialog(const FirmwarePreset& preset, QWidget* parent)
 
 void PresetDialog::setupUi()
 {
-    setMinimumWidth(480);
+    setMinimumWidth(560);
+    resize(640, sizeHint().height());
     auto* root = new QVBoxLayout(this);
 
     // --- Name ---
     auto* formLayout = new QFormLayout;
+    formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_name = new QLineEdit(this);
-    m_name->setPlaceholderText(tr("My Preset"));
+    m_name->setPlaceholderText(tr("Leave empty for automatic name"));
     formLayout->addRow(tr("Preset name:"), m_name);
     root->addLayout(formLayout);
 
@@ -51,7 +55,7 @@ void PresetDialog::setupUi()
     m_rdSimple  = new QRadioButton(tr("Simple boot      (uuu <file.bin>)"), typeGroup);
     m_rdEmmc    = new QRadioButton(tr("Full eMMC        (uuu -b emmc_all <bootloader> <image.wic>)"), typeGroup);
     m_rdEmmc4g  = new QRadioButton(tr("Full eMMC + 4G   (uuu <4g.bin> → uuu -b emmc_all <bootloader> <image.wic>)"), typeGroup);
-    m_rdSimple->setChecked(true);
+    m_rdEmmc4g->setChecked(true);
     typeVBox->addWidget(m_rdSimple);
     typeVBox->addWidget(m_rdEmmc);
     typeVBox->addWidget(m_rdEmmc4g);
@@ -60,13 +64,14 @@ void PresetDialog::setupUi()
     // --- Paths ---
     auto* pathGroup  = new QGroupBox(tr("Files"), this);
     auto* pathLayout = new QFormLayout(pathGroup);
+    pathLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
     m_lblBin4g = new QLabel(tr("4G init file (.bin):"), pathGroup);
     auto* bin4gRow = new QHBoxLayout;
     m_bin4gPath    = new QLineEdit(pathGroup);
     m_bin4gPath->setPlaceholderText("path/to/imx-boot_4G.bin");
     m_btnBin4g     = new QPushButton(tr("Browse…"), pathGroup);
-    bin4gRow->addWidget(m_bin4gPath);
+    bin4gRow->addWidget(m_bin4gPath, /*stretch*/ 1);
     bin4gRow->addWidget(m_btnBin4g);
     pathLayout->addRow(m_lblBin4g, bin4gRow);
 
@@ -75,7 +80,7 @@ void PresetDialog::setupUi()
     m_binPath      = new QLineEdit(pathGroup);
     m_binPath->setPlaceholderText("path/to/imx-boot.bin");
     m_btnBin       = new QPushButton(tr("Browse…"), pathGroup);
-    binRow->addWidget(m_binPath);
+    binRow->addWidget(m_binPath, /*stretch*/ 1);
     binRow->addWidget(m_btnBin);
     pathLayout->addRow(m_lblBin, binRow);
 
@@ -84,7 +89,7 @@ void PresetDialog::setupUi()
     m_wicPath      = new QLineEdit(pathGroup);
     m_wicPath->setPlaceholderText("path/to/image.wic");
     m_btnWic       = new QPushButton(tr("Browse…"), pathGroup);
-    wicRow->addWidget(m_wicPath);
+    wicRow->addWidget(m_wicPath, /*stretch*/ 1);
     wicRow->addWidget(m_btnWic);
     pathLayout->addRow(m_lblWic, wicRow);
 
@@ -171,14 +176,44 @@ void PresetDialog::validate()
     if (!m_btnOk) return;
     auto exists = [](QLineEdit* e){ const QString t = e->text().trimmed(); return !t.isEmpty() && QFileInfo::exists(t); };
 
-    bool ok = !m_name->text().trimmed().isEmpty() && exists(m_binPath);
+    bool ok = exists(m_binPath);
 
     if (m_rdEmmc->isChecked())
         ok = ok && exists(m_wicPath);
     else if (m_rdEmmc4g->isChecked())
         ok = ok && exists(m_bin4gPath) && exists(m_wicPath);
 
+    const QString suggestion = autoName();
+    m_name->setPlaceholderText(suggestion.isEmpty()
+        ? tr("Leave empty for automatic name")
+        : tr("Auto: %1").arg(suggestion));
+
     m_btnOk->setEnabled(ok);
+}
+
+QString PresetDialog::autoName() const
+{
+    // Name after the main payload: the .wic image for eMMC types,
+    // otherwise the boot file.
+    const QString mainPath = (m_rdEmmc->isChecked() || m_rdEmmc4g->isChecked())
+        ? m_wicPath->text().trimmed()
+        : m_binPath->text().trimmed();
+    if (mainPath.isEmpty())
+        return {};
+
+    QString base = QFileInfo(mainPath).completeBaseName();
+    base.remove(QRegularExpression("\\.(rootfs|wic)$"));
+    if (base.isEmpty())
+        return {};
+
+    QString suffix;
+    if (m_rdEmmc4g->isChecked())
+        suffix = tr("eMMC + 4G");
+    else if (m_rdEmmc->isChecked())
+        suffix = tr("eMMC");
+    else
+        suffix = tr("Simple boot");
+    return QStringLiteral("%1 (%2)").arg(base, suffix);
 }
 
 FirmwarePreset PresetDialog::preset() const
@@ -188,6 +223,11 @@ FirmwarePreset PresetDialog::preset() const
                      ? QUuid::createUuid().toString(QUuid::WithoutBraces)
                      : m_editId;
     p.name     = m_name->text().trimmed();
+    if (p.name.isEmpty()) {
+        p.name = autoName();
+        if (p.name.isEmpty())
+            p.name = tr("Preset %1").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm"));
+    }
     p.bin4gPath  = m_bin4gPath->text().trimmed();
     p.binPath    = m_binPath->text().trimmed();
     p.wicPath    = m_wicPath->text().trimmed();
