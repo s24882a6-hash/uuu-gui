@@ -25,6 +25,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifdef _WIN32
+#  include <process.h>
+#else
+#  include <unistd.h>
+#endif
 #include <mutex>
 #include <string>
 #include <thread>
@@ -62,10 +67,13 @@ static std::string json_escape(const char* s)
 
 static void emit(const std::string& line)
 {
+    // JSON events go to stderr — stdout is unreliable when the process is
+    // spawned by a GUI (WIN32-subsystem) parent on Windows (the inherited pipe
+    // handle is valid but Qt never reads from it). The GUI treats '{'-prefixed
+    // stderr lines as events and everything else as log text.
     std::lock_guard<std::mutex> lk(g_out_mtx);
-    std::fputs(line.c_str(), stdout);
-    std::fputc('\n', stdout);
-    std::fflush(stdout);
+    std::fprintf(stderr, "%s\n", line.c_str());
+    std::fflush(stderr);
 }
 
 static void emit_log(const std::string& msg)
@@ -177,7 +185,11 @@ static int run_list()
 {
     uuu_for_each_devices(list_cb, nullptr);
     emit("{\"event\":\"list_end\"}");
-    return 0;
+    // _exit skips C++ global destructors (including libusb's thread teardown)
+    // which can hang for several seconds on Windows 10 with HID devices.
+    std::fflush(stdout);
+    std::fflush(stderr);
+    _exit(0);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

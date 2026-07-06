@@ -111,12 +111,13 @@ QMap<QString, UsbDevice> DeviceMonitorThread::scanViaHelper()
     proc.start();
     if (!proc.waitForFinished(3000)) {
         proc.kill();
-        return {};
+        proc.waitForFinished(1000);
     }
 
+    // JSON events arrive on stderr (stdout is unreliable from a GUI parent on
+    // Windows); parseHelperList skips any non-JSON lines.
     QMap<QString, UsbDevice> result;
-    const QByteArray output = proc.readAllStandardOutput();
-    for (const UsbDevice& dev : parseHelperList(output))
+    for (const UsbDevice& dev : parseHelperList(proc.readAllStandardError()))
         result[dev.busId] = dev;
     return result;
 }

@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
 
@@ -254,6 +254,13 @@ jobs:
       - name: Install dependencies
         run: vcpkg install libusb zstd tinyxml2 bzip2 zlib openssl pkgconf --triplet x64-windows
 
+      # Exports the vcvars environment (VCINSTALLDIR, VCToolsRedistDir) to the
+      # following steps — windeployqt --compiler-runtime needs it to locate the
+      # CRT redist DLLs, and silently skips them when it's absent.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Build
         run: |
           # libuuu's CMake uses pkg_check_modules, so point pkg-config at vcpkg's .pc files
@@ -265,7 +272,24 @@ jobs:
           cmake --build build --config Release
 
       - name: Deploy
-        run: windeployqt build/Release/UUUFlashTool.exe
+        run: |
+          # --compiler-runtime bundles msvcp140*/vcruntime140* next to the exe;
+          # without them the app picks up the system copies, which on Windows 10
+          # are often too old for binaries built by the latest MSVC STL.
+          windeployqt --compiler-runtime build/Release/UUUFlashTool.exe
+          # Copy vcpkg runtime DLLs (zstd, tinyxml2, bzip2, zlib, openssl, libusb)
+          Get-ChildItem "C:/vcpkg/installed/x64-windows/bin" -Filter "*.dll" |
+            Copy-Item -Destination "build/Release/"
+          # Fallback + hard check: the CRT DLLs must ship in the artifact, or
+          # the app crashes on Windows 10 machines with an old msvcp140.dll.
+          if (-not (Test-Path "build/Release/msvcp140.dll")) {
+            Get-ChildItem "$env:VCToolsRedistDir/x64" -Recurse -Include msvcp140*.dll,vcruntime140*.dll |
+              Copy-Item -Destination "build/Release/"
+          }
+          if (-not (Test-Path "build/Release/msvcp140.dll")) {
+            Write-Error "msvcp140.dll missing from artifact — CRT bundling failed"
+            exit 1
+          }
 
       - uses: actions/upload-artifact@v4
         with:

@@ -3,6 +3,16 @@ project(UUUFlashTool VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# MSVC STL >= VS2022 17.10 makes std::mutex's constructor constexpr. Binaries
+# built with it crash inside mutex::lock() when run against an older
+# msvcp140.dll (typical on Windows 10, where the VC++ redistributable is
+# rarely updated; Windows 11 ships a newer one — hence "works on 11, crashes
+# on 10"). Restore the old ABI-compatible behavior everywhere, including the
+# FetchContent'd libuuu targets below.
+if(MSVC)
+    add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
