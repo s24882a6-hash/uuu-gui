@@ -29,6 +29,7 @@
 #  include <process.h>
 #else
 #  include <unistd.h>
+#  include <libusb.h>
 #endif
 #include <mutex>
 #include <string>
@@ -307,6 +308,51 @@ static int finish(int rc, bool bestEffort)
     return permission ? 2 : 1;
 }
 
+// Pre-flight device-access probe. When the process lacks the rights to open
+// the board (no udev rule on Linux, not root on macOS), libuuu doesn't fail —
+// it keeps polling for a matching device forever, so the GUI hangs on
+// "Device attached" with no error to react to. Probe every NXP-VID device
+// with libusb up front: if at least one is present but none can be opened
+// and the failure is LIBUSB_ERROR_ACCESS, report a permission error so the
+// GUI can offer the udev rule / sudo password right away.
+#ifndef _WIN32
+static bool device_access_denied()
+{
+    static constexpr uint16_t kNxpVids[] = { 0x1fc9, 0x15a2 };
+
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&ctx) < 0)
+        return false;                 // can't probe — let libuuu try its luck
+
+    libusb_device** list = nullptr;
+    ssize_t n = libusb_get_device_list(ctx, &list);
+
+    bool anyNxp = false, anyOpenable = false, accessError = false;
+    for (ssize_t i = 0; i < n; ++i) {
+        libusb_device_descriptor desc{};
+        if (libusb_get_device_descriptor(list[i], &desc) != 0) continue;
+        bool nxp = false;
+        for (uint16_t vid : kNxpVids) nxp |= (desc.idVendor == vid);
+        if (!nxp) continue;
+
+        anyNxp = true;
+        libusb_device_handle* h = nullptr;
+        int rc = libusb_open(list[i], &h);
+        if (rc == 0) {
+            anyOpenable = true;
+            libusb_close(h);
+        } else if (rc == LIBUSB_ERROR_ACCESS) {
+            accessError = true;
+        }
+    }
+
+    if (list) libusb_free_device_list(list, 1);
+    libusb_exit(ctx);
+
+    return anyNxp && !anyOpenable && accessError;
+}
+#endif
+
 // The GUI keeps our stdin pipe open for the whole flash and closes it to
 // request cancellation — it cannot signal us when we run under sudo (a
 // non-root process may not signal a root-owned one). Exit hard on EOF:
@@ -351,6 +397,15 @@ static int run_phase(const std::vector<std::string>& args)
     start_stdin_watchdog();
     uuu_register_notify_callback(notify_cb, nullptr);
     emit("{\"event\":\"phase_start\"}");
+
+#ifndef _WIN32
+    // Fail fast on missing device permissions (skip for best-effort phases:
+    // by then earlier phases have already proven access works).
+    if (!bestEffort && device_access_denied()) {
+        g_err = "Cannot open USB device: permission denied (LIBUSB_ERROR_ACCESS)";
+        return finish(1, false);
+    }
+#endif
 
     int rc = 0;
     if (haveBoot) {
