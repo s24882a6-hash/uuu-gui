@@ -445,7 +445,12 @@ int main(int argc, char** argv)
     std::vector<std::string> rest(argv + 2, argv + argc);
 
     if (mode == "list")  return run_list();
-    if (mode == "phase") return run_phase(rest);
+    if (mode == "phase") {
+        int rc = run_phase(rest);
+        std::fflush(stdout);
+        std::fflush(stderr);
+        _exit(rc);
+    }
 
     std::fprintf(stderr, "unknown mode: %s\n", mode.c_str());
     return 64;
