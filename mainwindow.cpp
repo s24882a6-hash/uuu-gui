@@ -259,12 +259,12 @@ QWidget* MainWindow::makePresetsPanel()
     }
     layout->addWidget(m_presetFilesLbl);
 
+    layout->addStretch();
+
     m_autoFlash      = new QCheckBox(tr("Auto-flash on connect"), group);
     m_chkRebootAfter = new QCheckBox(tr("Reboot after flash"), group);
     layout->addWidget(m_autoFlash);
     layout->addWidget(m_chkRebootAfter);
-
-    layout->addStretch();
 
     connect(m_btnAdd,    &QPushButton::clicked, this, &MainWindow::addPreset);
     connect(m_btnEdit,   &QPushButton::clicked, this, &MainWindow::editPreset);
@@ -358,9 +358,10 @@ void MainWindow::applySettings()
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-void MainWindow::refreshPresetList()
+void MainWindow::refreshPresetList(const QString& selectId)
 {
-    QString selectedId = m_presetCombo->currentData().toString();
+    QString selectedId = selectId.isEmpty() ? m_presetCombo->currentData().toString()
+                                            : selectId;
 
     {
         QSignalBlocker blocker(m_presetCombo);
@@ -407,9 +408,12 @@ void MainWindow::addPreset()
 {
     PresetDialog dlg(this);
     if (dlg.exec() != QDialog::Accepted) return;
-    m_presets << dlg.preset();
+
+    // preset() mints a fresh id on every call, so keep the one we store.
+    const FirmwarePreset p = dlg.preset();
+    m_presets << p;
     saveSettings();
-    refreshPresetList();
+    refreshPresetList(p.id);
 }
 
 void MainWindow::editPreset()

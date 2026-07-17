@@ -63,7 +63,7 @@ private:
     void saveSettings();
 
     // --- Helpers ---
-    void refreshPresetList();
+    void refreshPresetList(const QString& selectId = {});
     void retranslateUi();
     void applyLanguage(const QString& lang);
     void applySettings();
