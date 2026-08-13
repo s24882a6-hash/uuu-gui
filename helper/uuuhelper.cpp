@@ -20,6 +20,7 @@
 //               --cmd "<single uuu command>" [--besteffort]
 
 #include "libuuu.h"
+#include "vendorids.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -384,15 +385,19 @@ static int finish(int rc, bool bestEffort)
 // Pre-flight device-access probe. When the process lacks the rights to open
 // the board (no udev rule on Linux, not root on macOS), libuuu doesn't fail —
 // it keeps polling for a matching device forever, so the GUI hangs on
-// "Device attached" with no error to react to. Probe every NXP-VID device
-// with libusb up front: if at least one is present but none can be opened
-// and the failure is LIBUSB_ERROR_ACCESS, report a permission error so the
-// GUI can offer the udev rule / sudo password right away.
+// "Device attached" with no error to react to. Probe every VID the board can
+// enumerate as across all flashing phases with libusb up front: if at least
+// one is present but none can be opened and the failure is
+// LIBUSB_ERROR_ACCESS, report a permission error so the GUI can offer the
+// udev rule / sudo password right away.
+//
+// This has to cover every phase, not just the initial SDP one — a probe run
+// during phase 2+ (after the board re-enumerated into fastboot/gadget mode)
+// only sees the *new* VID, so restricting this list to the SDP VIDs alone
+// would silently miss a permission error there and hang instead.
 #ifndef _WIN32
 static bool device_access_denied()
 {
-    static constexpr uint16_t kNxpVids[] = { 0x1fc9, 0x15a2 };
-
     libusb_context* ctx = nullptr;
     if (libusb_init(&ctx) < 0)
         return false;                 // can't probe — let libuuu try its luck
@@ -405,7 +410,7 @@ static bool device_access_denied()
         libusb_device_descriptor desc{};
         if (libusb_get_device_descriptor(list[i], &desc) != 0) continue;
         bool nxp = false;
-        for (uint16_t vid : kNxpVids) nxp |= (desc.idVendor == vid);
+        for (const VendorId& v : kFlashVendorIds) nxp |= (desc.idVendor == v.vid);
         if (!nxp) continue;
 
         anyNxp = true;

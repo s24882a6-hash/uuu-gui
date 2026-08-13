@@ -175,7 +175,10 @@ if(PKG_CONFIG_FOUND)
 endif()
 
 add_executable(uuu-helper helper/uuuhelper.cpp)
-target_include_directories(uuu-helper PRIVATE "${mfgtools_SOURCE_DIR}/libuuu")
+target_include_directories(uuu-helper PRIVATE
+    "${mfgtools_SOURCE_DIR}/libuuu"
+    "${CMAKE_CURRENT_SOURCE_DIR}" # vendorids.h
+)
 if(NOT WIN32)
     # -g: keep debug info even in Release so the crash handler's backtrace
     # resolves function names, not just addresses. -rdynamic: export all

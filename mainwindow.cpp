@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "vendorids.h"
 #include "presetdialog.h"
 #include "deviceitemwidget.h"
 #include "settingsdialog.h"
@@ -594,19 +595,16 @@ void MainWindow::onDeviceAuthFailed(DeviceItemWidget* widget)
 #ifdef Q_OS_LINUX
 bool MainWindow::installUdevRule()
 {
-    // Every VID libuuu's built-in config matches against, across all phases
-    // and board vendors: NXP/Freescale recovery mode, the Linux USB gadget
-    // and Google fastboot IDs boards re-enumerate as during flashing, plus
-    // Boundary Devices' and STMicro's own SPL/fastboot IDs and SigmaTel's
-    // i.MX28 recovery ID.
-    static const char kRules[] =
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1fc9\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"15a2\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"0525\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"0483\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"3016\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"066f\", MODE=\"0666\"\n";
+    // Built from kFlashVendorIds (vendorids.h) — every VID libuuu's built-in
+    // config matches against, across all phases and board vendors, kept in
+    // sync in one place with uuu-helper's permission probe.
+    // Comment lines in a udev rules file must start with '#' — udev doesn't
+    // support a trailing inline comment on a rule line — so the label from
+    // kFlashVendorIds goes on its own line above the rule it documents.
+    QString rules;
+    for (const VendorId& v : kFlashVendorIds)
+        rules += QString("# %1\nSUBSYSTEM==\"usb\", ATTRS{idVendor}==\"%2\", MODE=\"0666\"\n")
+                     .arg(v.label, QString::number(v.vid, 16).rightJustified(4, '0'));
 
     const QString script = QStringLiteral(
         "set -e\n"
@@ -614,7 +612,7 @@ bool MainWindow::installUdevRule()
         "%1"
         "EOF\n"
         "udevadm control --reload\n"
-        "udevadm trigger --subsystem-match=usb\n").arg(QString::fromLatin1(kRules));
+        "udevadm trigger --subsystem-match=usb\n").arg(rules);
 
     // pkexec shows polkit's own authentication dialog, so the password never
     // passes through this process.

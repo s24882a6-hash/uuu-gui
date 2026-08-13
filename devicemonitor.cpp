@@ -1,4 +1,5 @@
 #include "devicemonitor.h"
+#include "vendorids.h"
 #include <QMap>
 #include <QProcess>
 #include <QJsonDocument>
@@ -7,10 +8,6 @@
 #ifdef HAVE_LIBUSB
 #  include <libusb.h>
 #endif
-
-// NXP / Freescale USB VIDs used in SDP / fastboot recovery mode
-static constexpr quint16 VID_NXP       = 0x1fc9;
-static constexpr quint16 VID_FREESCALE = 0x15a2;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // UsbDevice helpers
@@ -54,7 +51,9 @@ void DeviceMonitorThread::setHelperPath(const QString& path)
 
 bool DeviceMonitorThread::isNxpDevice(quint16 vid)
 {
-    return vid == VID_NXP || vid == VID_FREESCALE;
+    for (uint16_t sdpVid : kSdpVendorIds)
+        if (vid == sdpVid) return true;
+    return false;
 }
 
 // Parse "uuu-helper list" output: one JSON object per line, e.g.
