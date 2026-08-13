@@ -74,14 +74,33 @@ cmake --build build
 ./build/uuuapp
 ```
 
-To flash USB devices without `sudo`, add a udev rule for NXP devices:
+You don't need to set anything up ahead of time: the first time a flash hits
+a permission error, the app offers to install the udev rule itself via
+`pkexec` (shows the desktop's native authentication dialog — the password
+never passes through the app). Accept it and the device stays accessible
+without `sudo` from then on, across reboots. Decline and that flash falls
+back to `sudo` with a password prompt instead (cached for the rest of the
+session; asked again for later devices only if you decline again).
+
+**(Optional)** To have the rule in place ahead of time — e.g. for headless
+provisioning, or if `pkexec`/a polkit agent isn't available on your setup —
+add it by hand:
 
 ```bash
-echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="1fc9", MODE="0666"' | sudo tee /etc/udev/rules.d/70-nxp.rules
-sudo udevadm control --reload-rules
+sudo tee /etc/udev/rules.d/70-uuu-gui.rules > /dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1fc9", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="15a2", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0525", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="18d1", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="3016", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="066f", MODE="0666"
+EOF
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=usb
 ```
 
-Without this rule the app prompts for your password automatically when it hits a permission error and re-runs the flash via `sudo`.
+The board re-enumerates under a different USB vendor ID at each flashing phase, and the exact ID depends on the board vendor and SoC — these are every VID `libuuu`'s built-in config matches against: `1fc9` (NXP SDP/SDPS), `15a2` (Freescale, older i.MX SoCs), `0525` (Linux USB gadget, SPL/fastboot), `0483` (STMicroelectronics, fastboot), `18d1` (Google, default fastboot VID), `3016` (Boundary Devices, SPL), `066f` (SigmaTel, i.MX28 recovery). Missing the one your board actually uses means the serial number can't be read on that phase and the device silently disappears from the list.
 
 ### macOS
 

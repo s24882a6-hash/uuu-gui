@@ -74,14 +74,25 @@ cmake --build build
 ./build/uuuapp
 ```
 
-Для работы с USB без sudo добавьте udev-правило для устройств NXP:
+Заранее ничего настраивать не нужно: как только прошивка первый раз упирается в ошибку доступа, приложение само предлагает установить udev-правило через `pkexec` (показывает нативный диалог аутентификации рабочего стола — пароль через само приложение не проходит). Согласитесь — и устройство остаётся доступным без `sudo` навсегда, включая после перезагрузок. Откажетесь — та конкретная прошивка пойдёт через `sudo` с запросом пароля (кэшируется до конца сессии; для следующих устройств спросит снова, только если вы откажетесь ещё раз).
+
+**(Опционально)** Чтобы поставить правило заранее — например, для безголового провижининга, или если `pkexec`/polkit-агент недоступны в вашей среде — добавьте его вручную:
 
 ```bash
-echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="1fc9", MODE="0666"' | sudo tee /etc/udev/rules.d/70-nxp.rules
-sudo udevadm control --reload-rules
+sudo tee /etc/udev/rules.d/70-uuu-gui.rules > /dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1fc9", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="15a2", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0525", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="18d1", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="3016", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="066f", MODE="0666"
+EOF
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=usb
 ```
 
-Без этого правила приложение при ошибке доступа само предложит установить udev-правило через `pkexec` или запросит пароль и перезапустит прошивку через `sudo`.
+Плата переэнумерируется под разным USB vendor ID на каждой фазе прошивки, и конкретный ID зависит от производителя платы и SoC — это все VID, под которые встроенный конфиг `libuuu` ищет устройство: `1fc9` (NXP SDP/SDPS), `15a2` (Freescale, старые i.MX SoC), `0525` (Linux USB gadget, SPL/fastboot), `0483` (STMicroelectronics, fastboot), `18d1` (Google, VID fastboot по умолчанию), `3016` (Boundary Devices, SPL), `066f` (SigmaTel, восстановление i.MX28). Если не хватает именно того VID, что использует ваша плата, на этой фазе не читается серийник и устройство молча пропадает из списка.
 
 ### macOS
 

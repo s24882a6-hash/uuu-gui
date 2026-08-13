@@ -594,14 +594,19 @@ void MainWindow::onDeviceAuthFailed(DeviceItemWidget* widget)
 #ifdef Q_OS_LINUX
 bool MainWindow::installUdevRule()
 {
-    // VIDs covered by `uuu -udev`: NXP/Freescale recovery mode plus the
-    // fastboot gadget IDs boards re-enumerate as during flashing.
+    // Every VID libuuu's built-in config matches against, across all phases
+    // and board vendors: NXP/Freescale recovery mode, the Linux USB gadget
+    // and Google fastboot IDs boards re-enumerate as during flashing, plus
+    // Boundary Devices' and STMicro's own SPL/fastboot IDs and SigmaTel's
+    // i.MX28 recovery ID.
     static const char kRules[] =
         "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1fc9\", MODE=\"0666\"\n"
         "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"15a2\", MODE=\"0666\"\n"
         "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"0525\", MODE=\"0666\"\n"
         "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"0483\", MODE=\"0666\"\n"
-        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", MODE=\"0666\"\n";
+        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", MODE=\"0666\"\n"
+        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"3016\", MODE=\"0666\"\n"
+        "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"066f\", MODE=\"0666\"\n";
 
     const QString script = QStringLiteral(
         "set -e\n"
