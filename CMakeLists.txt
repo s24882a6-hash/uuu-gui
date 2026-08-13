@@ -176,6 +176,14 @@ endif()
 
 add_executable(uuu-helper helper/uuuhelper.cpp)
 target_include_directories(uuu-helper PRIVATE "${mfgtools_SOURCE_DIR}/libuuu")
+if(NOT WIN32)
+    # -g: keep debug info even in Release so the crash handler's backtrace
+    # resolves function names, not just addresses. -rdynamic: export all
+    # symbols to the dynamic table so backtrace_symbols_fd() can find them
+    # without needing a separate debug-symbol package installed.
+    target_compile_options(uuu-helper PRIVATE -g)
+    target_link_options(uuu-helper PRIVATE -rdynamic)
+endif()
 target_link_libraries(uuu-helper PRIVATE
     uuc_s
     PkgConfig::HELPER_LIBUSB

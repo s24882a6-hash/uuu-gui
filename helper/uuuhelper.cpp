@@ -25,11 +25,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <csignal>
 #ifdef _WIN32
 #  include <process.h>
+#  include <windows.h>
 #else
 #  include <unistd.h>
 #  include <libusb.h>
+#  include <execinfo.h>
 #endif
 #include <mutex>
 #include <string>
@@ -90,6 +93,76 @@ static void emit_progress(int pct)
 {
     emit("{\"event\":\"progress\",\"pct\":" + std::to_string(pct) + "}");
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Crash handler — libuuu/libusb can segfault or abort mid-transfer when a
+// board disappears unexpectedly (see GUI issue: "uuu-helper crashed" with no
+// other log line). Without this the GUI's log window is left blank; with it,
+// at least the signal and a raw backtrace reach the log before the process
+// dies the same way it would have anyway.
+// ──────────────────────────────────────────────────────────────────────────────
+
+#ifndef _WIN32
+// Signal handlers may only call async-signal-safe functions — no mutex, no
+// fprintf/std::string. write() and backtrace_symbols_fd() qualify.
+static void write_raw(int fd, const char* s)
+{
+    (void)!write(fd, s, std::strlen(s));
+}
+
+static const char* signal_name(int sig)
+{
+    switch (sig) {
+    case SIGSEGV: return "SIGSEGV (segmentation fault)";
+    case SIGABRT: return "SIGABRT (abort)";
+    case SIGBUS:  return "SIGBUS (bus error)";
+    case SIGFPE:  return "SIGFPE (floating point exception)";
+    case SIGILL:  return "SIGILL (illegal instruction)";
+    default:      return "unknown signal";
+    }
+}
+
+static void crash_handler(int sig)
+{
+    write_raw(2, "{\"event\":\"log\",\"msg\":\"uuu-helper crashed: ");
+    write_raw(2, signal_name(sig));
+    write_raw(2, "\"}\n");
+
+    void* frames[32];
+    int n = backtrace(frames, 32);
+    write_raw(2, "--- backtrace (uuu-helper crash) ---\n");
+    backtrace_symbols_fd(frames, n, 2);
+    write_raw(2, "-------------------------------------\n");
+
+    // Restore the default handler and re-raise, so the process still exits
+    // the way it normally would (core dump if enabled, same signal for the
+    // parent's wait() status) — we're only adding a log line in front of that.
+    std::signal(sig, SIG_DFL);
+    std::raise(sig);
+}
+
+static void install_crash_handler()
+{
+    for (int sig : {SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL})
+        std::signal(sig, crash_handler);
+}
+#else
+static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
+{
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+        "{\"event\":\"log\",\"msg\":\"uuu-helper crashed: exception code 0x%08lX\"}\n",
+        ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0);
+    std::fputs(buf, stderr);
+    std::fflush(stderr);
+    return EXCEPTION_EXECUTE_HANDLER; // let Windows terminate the process as usual
+}
+
+static void install_crash_handler()
+{
+    SetUnhandledExceptionFilter(crash_handler);
+}
+#endif
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Notify callback → progress / log
@@ -436,6 +509,8 @@ static int run_phase(const std::vector<std::string>& args)
 
 int main(int argc, char** argv)
 {
+    install_crash_handler();
+
     if (argc < 2) {
         std::fprintf(stderr, "usage: uuu-helper list | phase <opts>\n");
         return 64;

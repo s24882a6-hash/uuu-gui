@@ -232,7 +232,7 @@ void FlashWorker::onFinished(int exitCode, QProcess::ExitStatus status)
         QString errMsg = !m_lastError.isEmpty()
             ? m_lastError
             : (status == QProcess::CrashExit
-                ? QStringLiteral("uuu-helper crashed")
+                ? QStringLiteral("uuu-helper crashed — see log above for the signal and backtrace")
                 : QString("uuu-helper exited with code %1").arg(exitCode));
         emit finished(false, errMsg);
         return;
