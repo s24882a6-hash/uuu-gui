@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
@@ -66,6 +67,19 @@ void SettingsDialog::setupUi()
     dirRow->addWidget(m_logDirBrowse);
     logsLayout->addLayout(dirRow);
     root->addWidget(logsGroup);
+
+    m_deletePresets = new QPushButton(tr("Delete all presets"), this);
+    connect(m_deletePresets, &QPushButton::clicked, this, [this]() {
+        if (QMessageBox::question(this, tr("Delete all presets"),
+                tr("Delete all saved firmware presets?"),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        emit deletePresetsRequested();
+        m_deletePresets->setEnabled(false);
+    });
+
+    root->addStretch();
+    root->addWidget(m_deletePresets, 0, Qt::AlignLeft);
 
     auto updateLogDirState = [this]() {
         m_logDirEdit->setEnabled(m_chkSaveLogs->isChecked());
@@ -130,6 +144,7 @@ void SettingsDialog::retranslateUi()
 {
     setWindowTitle(tr("Settings"));
     m_generalGroup->setTitle(tr("General"));
+    m_deletePresets->setText(tr("Delete all presets"));
     m_langLabel->setText(tr("Language:"));
     m_themeLabel->setText(tr("Appearance:"));
     m_themeCombo->setItemText(0, tr("System"));

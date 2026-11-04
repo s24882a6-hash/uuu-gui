@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     setupUi();
     loadSettings();
-    refreshPresetList();
+    refreshPresetList(QSettings().value("selectedPresetId").toString());
 
     m_helperPath = AppPaths::helper();
 
@@ -277,6 +277,7 @@ QWidget* MainWindow::makePresetsPanel()
         m_btnEdit->setEnabled(has);
         m_btnDelete->setEnabled(has);
         updatePresetFilesLabel();
+        QSettings().setValue("selectedPresetId", m_presetCombo->currentData().toString());
     });
 
     return group;
@@ -340,6 +341,11 @@ void MainWindow::openSettings()
     connect(&dlg, &SettingsDialog::settingsSaved, this, [this]() {
         applySettings();
     });
+    connect(&dlg, &SettingsDialog::deletePresetsRequested, this, [this]() {
+        m_presets.clear();
+        refreshPresetList();
+        saveSettings();
+    });
     dlg.exec();
 }
 
@@ -378,6 +384,7 @@ void MainWindow::refreshPresetList(const QString& selectId)
     m_btnEdit->setEnabled(has);
     m_btnDelete->setEnabled(has);
     updatePresetFilesLabel();
+    QSettings().setValue("selectedPresetId", m_presetCombo->currentData().toString());
 }
 
 void MainWindow::updatePresetFilesLabel()

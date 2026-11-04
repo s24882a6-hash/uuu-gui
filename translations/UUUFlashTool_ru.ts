@@ -371,8 +371,8 @@ Alternatively, this flash can run via sudo with your password.</source>
     </message>
     <message>
         <location filename="../presetdialog.cpp" line="64"/>
-        <source>4G init file (.bin):</source>
-        <translation>Инициализация 4G (.bin):</translation>
+        <source>USB boot image (.bin)</source>
+        <translation>USB boot image (.bin)</translation>
     </message>
     <message>
         <location filename="../presetdialog.cpp" line="68"/>
@@ -427,6 +427,14 @@ Increase to 5–10 if device doesn&apos;t re-enumerate in time.</source>
 </context>
 <context>
     <name>SettingsDialog</name>
+    <message>
+        <source>Delete all presets</source>
+        <translation>Удалить все пресеты</translation>
+    </message>
+    <message>
+        <source>Delete all saved firmware presets?</source>
+        <translation>Удалить все сохранённые пресеты прошивки?</translation>
+    </message>
     <message>
         <location filename="../settingsdialog.cpp" line="21"/>
         <location filename="../settingsdialog.cpp" line="131"/>

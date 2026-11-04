@@ -66,7 +66,7 @@ void PresetDialog::setupUi()
     auto* pathLayout = new QFormLayout(pathGroup);
     pathLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
-    m_lblBin4g = new QLabel(tr("4G init file (.bin):"), pathGroup);
+    m_lblBin4g = new QLabel(tr("USB boot image (.bin)"), pathGroup);
     auto* bin4gRow = new QHBoxLayout;
     m_bin4gPath    = new QLineEdit(pathGroup);
     m_bin4gPath->setPlaceholderText("path/to/imx-boot_4G.bin");

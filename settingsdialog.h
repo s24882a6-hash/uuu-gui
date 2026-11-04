@@ -18,6 +18,7 @@ signals:
     void languageChanged(const QString& lang);
     void themeChanged(const QString& theme);
     void settingsSaved();
+    void deletePresetsRequested();
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -31,6 +32,7 @@ private:
     void loadFromSettings();
     void retranslateUi();
 
+    QPushButton* m_deletePresets = nullptr;
     QGroupBox*   m_generalGroup  = nullptr;
     QGroupBox*   m_logsGroup     = nullptr;
     QLabel*      m_langLabel     = nullptr;
