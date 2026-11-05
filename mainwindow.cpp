@@ -371,14 +371,15 @@ void MainWindow::refreshPresetList(const QString& selectId)
                                             : selectId;
 
     {
+        // Rebuilding the list must not persist a temporary selection.
         QSignalBlocker blocker(m_presetCombo);
         m_presetCombo->clear();
         for (const auto& p : m_presets)
             m_presetCombo->addItem(p.name, p.id);
-    }
 
-    int idx = m_presetCombo->findData(selectedId);
-    m_presetCombo->setCurrentIndex(idx >= 0 ? idx : (m_presetCombo->count() > 0 ? 0 : -1));
+        int idx = m_presetCombo->findData(selectedId);
+        m_presetCombo->setCurrentIndex(idx >= 0 ? idx : (m_presetCombo->count() > 0 ? 0 : -1));
+    }
 
     bool has = selectedPreset() != nullptr;
     m_btnEdit->setEnabled(has);
@@ -395,21 +396,28 @@ void MainWindow::updatePresetFilesLabel()
         return;
     }
     QStringList lines;
+    auto addFile = [&lines](const QString& label, const QString& path) {
+        const QFileInfo file(path);
+        QString line = (label + file.fileName()).toHtmlEscaped();
+        if (!file.isFile())
+            line = "<span style=\"color: red;\">" + line + "</span>";
+        lines << line;
+    };
     switch (p->type) {
     case FirmwarePreset::Type::SimpleBin:
-        lines << "bin: " + QFileInfo(p->binPath).fileName();
+        addFile("bin: ", p->binPath);
         break;
     case FirmwarePreset::Type::EmmcAll:
-        lines << "bootloader: " + QFileInfo(p->binPath).fileName();
-        lines << "wic: "        + QFileInfo(p->wicPath).fileName();
+        addFile("bootloader: ", p->binPath);
+        addFile("wic: ", p->wicPath);
         break;
     case FirmwarePreset::Type::EmmcAll4G:
-        lines << "bin: "        + QFileInfo(p->bin4gPath).fileName();
-        lines << "bootloader: " + QFileInfo(p->binPath).fileName();
-        lines << "wic: "        + QFileInfo(p->wicPath).fileName();
+        addFile("bin: ", p->bin4gPath);
+        addFile("bootloader: ", p->binPath);
+        addFile("wic: ", p->wicPath);
         break;
     }
-    m_presetFilesLbl->setPlainText(lines.join("\n"));
+    m_presetFilesLbl->setHtml(lines.join("<br>"));
 }
 
 void MainWindow::addPreset()
@@ -786,6 +794,7 @@ void MainWindow::saveSettings()
     s.setValue("autoFlash",        m_autoFlash->isChecked());
     s.setValue("rebootAfterFlash", m_chkRebootAfter->isChecked());
     s.setValue("splitterState",    m_splitter->saveState());
+    s.setValue("selectedPresetId", m_presetCombo->currentData().toString());
 
     QJsonArray arr;
     for (const auto& p : m_presets)
