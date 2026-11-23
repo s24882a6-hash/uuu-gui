@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- Фоновая прошивка: foreground-сервис типа connectedDevice. Для этого типа
+         Android 14+ требует одно из «предусловий»; CHANGE_NETWORK_STATE —
+         обычное разрешение без диалога и подходит в их число. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="UUU Flash"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/App">
+
+        <!-- singleTask — переподключение платы приходит в onNewIntent;
+             configChanges — Fold не пересоздаёт экран при раскрытии. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- После «всегда открывать» Android выдаёт приложению разрешение
+                 на плату сам, при каждом подключении. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+        </activity>
+
+        <!-- Отдельный процесс: libuuu — один запуск на процесс. -->
+        <service
+            android:name=".FlashService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice"
+            android:process=":flash" />
+    </application>
+</manifest>

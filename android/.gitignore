@@ -1,0 +1,8 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+*.apk
+.cxx/
+# Универсальные загрузчики — внутренние бинарники, в git не храним (см. README).
+app/src/main/assets/boot/*.bin

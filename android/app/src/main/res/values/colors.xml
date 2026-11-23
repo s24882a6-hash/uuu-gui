@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Палитра — из фронта панелей (frontend/css: index1.css, index_dark.css). -->
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+
+    <color name="bg">#EEF1F4</color>
+    <color name="card">#FFFFFF</color>
+    <color name="text">#181D22</color>
+    <color name="text2">#8A949A</color>
+    <color name="divider">#E2E7EA</color>
+    <color name="control">#E3E8EB</color>
+    <!-- Красный знака «Точмаш» — главная кнопка и прогресс. -->
+    <color name="accent">#C40606</color>
+    <color name="ok">#4CBF48</color>
+    <color name="error">#DB0000</color>
+    <bool name="light_bars">true</bool>
+</resources>

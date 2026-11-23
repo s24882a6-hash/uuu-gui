@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <application
+        android:label="UUU Probe"
+        android:theme="@android:style/Theme.DeviceDefault.DayNight">
+
+        <!-- singleTask: повторное подключение платы приходит в onNewIntent, а не
+             плодит новые окна. configChanges: Fold при раскрытии/складывании
+             иначе пересоздаёт Activity и лог пропадает. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Если пользователь согласится открывать плату в этом приложении,
+                 Android выдаёт разрешение на устройство автоматически. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+        </activity>
+    </application>
+</manifest>
