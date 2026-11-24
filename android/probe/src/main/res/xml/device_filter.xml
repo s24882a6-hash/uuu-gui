@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VID в десятичном виде. Тот же набор, что kFlashVendorIds в vendorids.h,
+     кроме STMicro и SigmaTel — для i.MX8M Plus они не нужны. -->
+<resources>
+    <usb-device vendor-id="8137" />  <!-- 0x1fc9 NXP: ROM SDPS 0146, U-Boot fastboot 0152 -->
+    <usb-device vendor-id="5538" />  <!-- 0x15a2 Freescale -->
+    <usb-device vendor-id="1317" />  <!-- 0x0525 Linux USB gadget: SPL b4a4, fastboot a4a5 -->
+    <usb-device vendor-id="6353" />  <!-- 0x18d1 Google fastboot -->
+    <usb-device vendor-id="12310" /> <!-- 0x3016 Boundary Devices -->
+</resources>
